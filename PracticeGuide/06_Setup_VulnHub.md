@@ -119,33 +119,38 @@ Recommended setup for practice:
 
 These are the **most-recommended training VMs**. Practising on them gives you the highest probability of having seen something similar to whatever the chief picks. Listed roughly in difficulty order.
 
+> Each VM page on VulnHub has its own SHA-1/MD5 hash and one or more mirrors. Always verify the hash after download.
+
 ### Beginner (do these first)
-| VM | Why valuable |
-|---|---|
-| **Basic Pentesting: 1** | Multiple paths (FTP, web, SSH brute) — great first VM |
-| **Kioptrix: Level 1 (#1)** | Classic; teaches old-Apache/Samba enumeration |
-| **DC-1** | Single famous web-app exploitation chain → SUID privesc |
-| **Mr. Robot: 1** | Themed, popular, very well-documented |
-| **OWASP Juice Shop (VulnHub edition)** | Same web app you already practised with `05_…` |
+| VM | Page URL | Why valuable |
+|---|---|---|
+| **Basic Pentesting: 1** | `https://www.vulnhub.com/entry/basic-pentesting-1,216/` | Multiple paths (FTP, web, SSH brute) — great first VM |
+| **Kioptrix: Level 1 (#1)** | `https://www.vulnhub.com/entry/kioptrix-level-1-1,22/` | Classic; teaches old-Apache/Samba enumeration |
+| **DC-1** | `https://www.vulnhub.com/entry/dc-1,292/` | Drupal 7 → Drupalgeddon → SUID `find` privesc |
+| **Mr. Robot: 1** | `https://www.vulnhub.com/entry/mr-robot-1,151/` | Themed, popular, very well-documented |
+| **OWASP Broken Web Apps** (alt to Juice Shop VM) | `https://www.vulnhub.com/entry/owasp-broken-web-applications-project-12,46/` | Stack of vulnerable web apps incl. WebGoat, DVWA, Mutillidae |
 
 ### Intermediate
-| VM | Why valuable |
-|---|---|
-| **DC-2** | wpscan + restricted shell escape + sudo git privesc |
-| **DC-3** | Single-flag, harder web exploit |
-| **DC-4** | Brute-force + restricted shell + binary privesc |
-| **Kioptrix: Level 2** | LAMP + command injection + kernel exploit |
-| **Kioptrix: Level 3** | LotusCMS + sudo abuse |
-| **Basic Pentesting: 2** | More realistic enum + OSINT |
+| VM | Page URL | Why valuable |
+|---|---|---|
+| **DC-2** | `https://www.vulnhub.com/entry/dc-2,311/` | wpscan + restricted shell escape + sudo git privesc |
+| **DC-3** | `https://www.vulnhub.com/entry/dc-32,312/` | Single-flag, harder web exploit |
+| **DC-4** | `https://www.vulnhub.com/entry/dc-4,313/` | Brute-force + restricted shell + binary privesc |
+| **Kioptrix: Level 2** | `https://www.vulnhub.com/entry/kioptrix-level-11-2,23/` | LAMP + command injection + kernel exploit |
+| **Kioptrix: Level 3** | `https://www.vulnhub.com/entry/kioptrix-level-12-3,24/` | LotusCMS + sudo abuse |
+| **Basic Pentesting: 2** | `https://www.vulnhub.com/entry/basic-pentesting-2,241/` | More realistic enum + OSINT |
 
 ### Advanced
-| VM | Why valuable |
-|---|---|
-| **DC-5 through DC-9** | Each adds a new technique (LFI/SQLi/restricted shell/kernel/etc.) |
-| **Sunset: Decoy** | Hash cracking + ssh + suid path-hijack |
-| **Sunset: Dawn** | SMB + sudo wildcards |
-| **HackInOS** | Container escape + WordPress |
-| **Funbox** series | Modern, varied techniques |
+| VM | Page URL | Why valuable |
+|---|---|---|
+| **DC-5** | `https://www.vulnhub.com/entry/dc-5,314/` | Local file inclusion + log poisoning |
+| **DC-6** | `https://www.vulnhub.com/entry/dc-6,315/` | wpscan + nmap NSE privesc |
+| **DC-7** | `https://www.vulnhub.com/entry/dc-7,356/` | OSINT-driven foothold |
+| **DC-8** | `https://www.vulnhub.com/entry/dc-8,367/` | SQLi + Drupal + exim4 |
+| **DC-9** | `https://www.vulnhub.com/entry/dc-9,412/` | knockd + LFI + scheduled exec |
+| **Sunset: Decoy** | `https://www.vulnhub.com/entry/sunset-decoy,505/` | Hash cracking + suid path-hijack |
+| **Sunset: Dawn** | `https://www.vulnhub.com/entry/sunset-dawn,341/` | SMB + sudo wildcards |
+| **HackInOS** | `https://www.vulnhub.com/entry/hackinos-1,295/` | Container escape + WordPress |
 
 > Realistic study target: 8–12 VMs over Week 2. Don't try to do all of them — **understand the methodology** instead.
 

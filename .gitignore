@@ -1,0 +1,20 @@
+# Claude Code local files (never commit)
+.claude/
+
+# Local agent / IDE state
+.vscode/
+.idea/
+
+# OS / editor cruft
+Thumbs.db
+.DS_Store
+*.swp
+*~
+
+# Office temp files
+~$*
+
+# Local working notes (keep your own scratch out of the repo)
+_tmp_*
+_scratch/
+*.local.md

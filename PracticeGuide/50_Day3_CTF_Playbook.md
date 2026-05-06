@@ -1,6 +1,8 @@
-# 40 — Day 2 CTF: OWASP Juice Shop — Methodology + Easy (★1–★2)
+# 50 — Day 3 (CTF morning) — OWASP Juice Shop: Methodology + Easy (★1–★2)
 
-**Time budget:** 6 hours total Day 2 if all CTF days are Juice Shop, otherwise 2 hours warm-up.
+> Day plan reminder: Day 1 = MA1+MA2; **Day 3 morning = Security Hardening (`24_…`)**; **Day 3 (this file) + Day 4 = CTF.**
+
+**Time budget:** ~3 hours warm-up on Day 3 morning, then VulnHub afternoon. Adjust if the actual schedule varies.
 **Target:** `http://localhost:3000` (your local instance from `05_Setup_JuiceShop.md`).
 
 > 🚫 No internet, no AI tools. The Pwning OWASP Juice Shop ebook is the only outside reference allowed (because it ships with the project itself, not because rules permit external write-ups — verify with the chief).
@@ -163,7 +165,7 @@ At the actual competition the organizers handle the integration; you only need t
 
 ---
 
-## Part E — Time pacing for Day 2
+## Part E — Time pacing for Day 3 morning
 
 | Time | Action |
 |---|---|
@@ -178,11 +180,11 @@ At the actual competition the organizers handle the integration; you only need t
 
 ## Mark map placeholder
 
-The marking-scheme rows for Day 2 (HO-/CM- prefixes) are Lyon leftovers. When the chief releases the ASEAN Juice Shop challenge mapping, fill in:
+The marking-scheme rows for Day 3 morning (HO-/CM- prefixes) are Lyon leftovers. When the chief releases the ASEAN Juice Shop challenge mapping, fill in:
 
 | ASEAN flag id | Juice Shop challenge | ★ | Solved | Hint used |
 |---|---|---|---|---|
 
 Track this row by row during the actual CTF.
 
-Next file: **`41_Day3_CTF_Red.md`** — medium challenges (★3–★4).
+Next file: **`51_Day3_VulnHub_BootToRoot.md`** — boot-to-root playbook + medium walkthroughs.

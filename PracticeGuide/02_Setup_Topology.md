@@ -152,10 +152,111 @@ Internet (PG-Internet)              LAN (PG-LAN)
 
 ---
 
-## E. Verification before moving on
+## E. Practice-Mode physical setup (Team 1 alone, with internet)
+
+The competition diagram in `Infrastructure-List (2).docx` shows 3 teams + a shared CTFD scoring server + a TV scoreboard, all on a competition LAN. For **solo Team 1 practice** you do NOT need the multi-team setup. Build this instead:
+
+### E.1 Wiring (practice)
+
+```
+                            ┌── (router / phone hotspot WAN)
+                            │   for downloading installers
+                            ▼
+                  ┌─────────────────────┐
+                  │   Home/team router  │
+                  └──────────┬──────────┘
+                             │
+                ┌────────────┴────────────┐
+                ▼                         ▼
+      ┌─────────────────┐       ┌─────────────────┐
+      │ ESXi Server     │       │  Unmanaged      │
+      │ 192.168.10.10   │───────│  Switch         │
+      └─────────────────┘       └─┬─────────┬─────┘
+                                  │         │
+                                  ▼         ▼
+                         ┌──────────┐  ┌──────────┐
+                         │ Laptop1  │  │ Laptop2  │
+                         │ NIC1     │  │ NIC1     │
+                         │ NIC2*    │  │ NIC2*    │
+                         └──────────┘  └──────────┘
+                          *NIC2 optional for practice
+```
+
+> **Internet uplink is for practice ONLY.** During the actual competition there is **no internet** — every package needed is pre-staged on the supplied VMs (per MA2 lines 178/181 *"Packages have been pre-downloaded"*). For Day 2 (Security Hardening) the competition organisers pre-download Security Onion + OpenVPN packages too, so you don't need internet there either. You only need internet during *practice* to download all the tools/VMs/ISOs.
+
+### E.2 What plugs into what
+
+| Cable | From | To |
+|---|---|---|
+| Cable 1 | Home router LAN port | Unmanaged switch port 1 |
+| Cable 2 | Switch port 2 | ESXi server NIC1 (mgmt) |
+| Cable 3 | Switch port 3 | Laptop1 NIC1 |
+| Cable 4 | Switch port 4 | Laptop2 NIC1 |
+
+Power up the switch first, then ESXi, then laptops.
+
+### E.3 Network settings on each laptop (Windows 10/11)
+
+For practice, set **NIC1 to DHCP** (so the home router gives it both an IP and an internet route). The static-IP approach in section A is for the **isolated competition rig** where there's no DHCP — for practice with internet, DHCP is simpler.
+
+1. *Settings → Network & Internet → Ethernet → NIC1 → IP assignment → Edit → Automatic (DHCP)* → Save.
+2. Verify: `ipconfig` shows an IP from your home router's range (e.g. 192.168.1.x) plus a Default Gateway.
+3. Verify internet: `ping 8.8.8.8` and `ping google.com` both reply.
+
+### E.4 ESXi management IP for practice
+
+Either:
+- Let DHCP give ESXi an IP automatically (note it from the ESXi console at boot), then browse to `https://<dhcp-ip>/ui`.
+- Or set a static IP on ESXi (`F2` at console → Configure Management Network → IPv4 Configuration → Static → 192.168.1.10, mask 255.255.255.0, gateway 192.168.1.1). Adjust to match your home router's subnet.
+
+> Take note of the ESXi IP — you'll use it from both laptops to reach the web UI.
+
+### E.5 Optional: 2nd NIC per laptop (matches competition exactly)
+
+Competition uses 2 NICs per PC (one for team eSXi, one for competition LAN/CTFD). For practice you can:
+- **Skip it.** Use only NIC1 for everything. Simpler, fully functional for solo practice.
+- **Buy USB-Ethernet adapters** (~$10 each) — gives each laptop a 2nd NIC. Plug into the same switch. Then:
+  - NIC1 = team subnet (192.168.1.x with internet)
+  - NIC2 = "competition" subnet (could be a 2nd small switch, or another VLAN)
+- **Use a virtual NIC inside Workstation** — VMware Workstation can present a 2nd "host-only" virtual NIC. Cheapest option, but only works for VMs, not the host laptop's apps.
+
+> For Day 1 + Day 2 + CTF practice — single NIC1 is enough. The 2-NIC setup only matters for the spectator-scoreboard simulation (next section).
+
+### E.6 Optional: TV / spare monitor for the CTFD scoreboard
+
+The Infrastructure-List diagram shows a TV connected to a CTFD server displaying the scoreboard for spectators. You don't need this to *play* — but if you want a realistic dress-rehearsal, here are 3 options ranked by effort:
+
+| Option | What you need | Effort |
+|---|---|---|
+| **A — Skip it** | Nothing. Just open the CTFD UI in a browser tab on Laptop1 when you want to check score | None — recommended for normal practice |
+| **B — TV mirrored from a laptop** | Spare TV + HDMI cable + Laptop1's HDMI-out. Open CTFD scoreboard in a browser, drag to the TV display, fullscreen (F11) | 5 min |
+| **C — Dedicated CTFD box** | Spare PC or laptop running CTFD locally, plugged into the switch, with TV via HDMI showing the scoreboard. *(Setting up CTFd is non-trivial without Docker; for solo practice, use the Juice Shop native score-board instead — see `05_…` Step 4.)* | 30 min |
+
+**For local CTFD setup, see `05_Setup_JuiceShop.md` Step 4** — you already have the install steps. Just leave that PC running CTFD in the corner of the room with the TV plugged into it.
+
+> ⚠️ TV scoreboard at competition is provided by the organisers — don't bring your own. Section E.6 is purely for practice realism.
+
+### E.7 Summary — the bare-minimum vs maximum practice rig
+
+| Item | Bare minimum (works for everything) | Full sim (matches competition feel) |
+|---|---|---|
+| Laptops | 2, single NIC each, DHCP | 2, dual NIC each, NIC1 team / NIC2 competition |
+| ESXi server | 1 with 1 NIC | 1 with 2 NICs (mgmt + VM traffic separated) |
+| Switch | 1 unmanaged 5-port | 1 per network (2 switches total) |
+| Internet | Yes (during build) | Yes (build) / disconnect for CTF dry-runs |
+| TV / monitor | None | HDMI from CTFD-running PC |
+| CTFD scoreboard | None — use Juice Shop's built-in score-board on Laptop1 | Optional dedicated PC (only for spectator dress-rehearsal) |
+
+Recommendation: start with **bare minimum** for Days 1 + 2 prep. Add CTFD/TV during Week 2 only if you want the dress-rehearsal experience.
+
+---
+
+## F. Verification before moving on
 
 - [ ] All five port groups visible in ESXi UI under *Networking → Port groups*
-- [ ] Each laptop can reach ESXi web UI at `https://192.168.10.10/ui`
+- [ ] Each laptop can reach ESXi web UI at `https://<esxi-ip>/ui`
+- [ ] Each laptop has internet (`ping google.com` works)
 - [ ] You understand which port group each VM should sit on
+- [ ] You've decided: bare-minimum or full-sim practice rig (both are fine)
 
 If yes → next file: `03_Setup_VMs_MA1.md`.

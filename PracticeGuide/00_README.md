@@ -19,11 +19,13 @@ Every step in this guide tells you:
 
 1. Read `01_Setup_Tools.md` first — it lists every download and how to install it.
 2. Then `02_Setup_Topology.md` — physical wiring + virtual networking.
-3. Then build the practice VMs from `03_Setup_VMs_MA1.md` and `04_Setup_VMs_MA2.md`. (Do these once. Snapshot every VM after install.)
-4. Practice the actual deliverables from the `10_…` through `30_…` files.
-5. CTF practice from `40_…` through `42_…`.
-6. Use `90_Practice_Schedule.md` as a 2-week calendar.
-7. After every dry-run, open `99_Marking_Map.md` and tick what you completed — it shows you what % of marks you'd have earned.
+3. Build the Day-1 practice VMs from `03_Setup_VMs_MA1.md` and `04_Setup_VMs_MA2.md`. (Do these once. Snapshot every VM after install.)
+4. Build the Day-2 + CTF environments from `05_Setup_JuiceShop.md`, `06_Setup_VulnHub.md`, `07_Setup_SecurityOnion.md`.
+5. Practice Day 1 deliverables: `10_…` through `30_…`.
+6. Practice Day 2 deliverables: `24_Day2_SecurityHardening.md`.
+7. Practice Day 3–4 CTF: `50_…` through `52_…`.
+8. Use `90_Practice_Schedule.md` as a 2-week calendar.
+9. After every dry-run, open `99_Marking_Map.md` and tick what you completed — it shows you what % of marks you'd have earned.
 
 ---
 
@@ -33,10 +35,13 @@ Every step in this guide tells you:
 |---|---|---|---|
 | **Day 1 — morning (3 h)** | MA1: Assess Apache/website security on grimshay.local. Write 2 vulnerabilities + executive summary. | A1 (4 aspects) | ~part of 25 |
 | **Day 1 — afternoon (3 h)** | MA2: Build pfSense, harden LinSRV1, configure WinSRV1 GPOs/share/audit, finish PKI on WinSRV3, verify from clients. | A2–A8 | rest of 25 |
-| **Day 2 (6 h)** | CTF on **OWASP Juice Shop** — easy challenges (★1–★2). | Criterion B | 25 |
-| **Day 3 (6 h)** | CTF on **OWASP Juice Shop** — medium (★3–★4). | Criterion C | 25 |
-| **Day 4 (6 h)** | CTF on **OWASP Juice Shop** — hard (★5–★6). | Criterion D | 25 |
+| **Day 2 (6 h)** | **Security Hardening from scratch** — Security Onion (SOC), OpenVPN, IR + forensics + AppSec. | Criterion B | 25 |
+| **Day 3 morning (3 h)** | CTF warm-up — OWASP Juice Shop ★1–★2. | Criterion C (part) | — |
+| **Day 3 afternoon (3 h)** | CTF — VulnHub boot-to-root (1 VM). | Criterion C (part) | combined 25 |
+| **Day 4 (6 h)** | CTF — harder VulnHub VM + Juice Shop ★5–★6. | Criterion D | 25 |
 | **Total** | | | **100** |
+
+> ⚠️ Day 2 is a **build module**, not pure CTF — the chief confirmed Security Onion + OpenVPN are the named tools. CTF (Days 3–4) uses **OWASP Juice Shop** + **random-pick VulnHub VMs**. The exact day split is a best-guess; if the chief later confirms different days, the *content* of each file still applies — just on a different calendar day.
 
 > ⚠️ The official Test Project Development plan only lists 3 competition days. The marking scheme has 4 marking days. Treat this as 4 days for safety; if the schedule is later confirmed as 3, Days 3 and 4 will be compressed into Days 2 and 3.
 
@@ -96,15 +101,18 @@ Total all the K-values across all the steps you successfully complete and you ha
 | `02_Setup_Topology.md` | Physical + virtual network setup |
 | `03_Setup_VMs_MA1.md` | Build the MA1 (grimshay.local) practice environment |
 | `04_Setup_VMs_MA2.md` | Build the MA2 (manila.com) practice environment |
-| `05_Setup_JuiceShop.md` | Install + configure OWASP Juice Shop (the actual CTF target) |
+| `05_Setup_JuiceShop.md` | Install + configure OWASP Juice Shop (web CTF target) |
+| `06_Setup_VulnHub.md` | Download + import VulnHub VMs (boot-to-root CTF targets) |
+| `07_Setup_SecurityOnion.md` | Install + configure Security Onion 2 (Day 2 SOC platform) |
 | `10_Day1_MA1_Solution.md` | Day 1 morning — solution walkthrough |
 | `20_Day1_MA2_Firewall.md` | Day 1 PM — pfSense / OpenVPN / Snort |
 | `21_Day1_MA2_LinSRV1.md` | Day 1 PM — CentOS hardening |
 | `22_Day1_MA2_WinSRV1_AD.md` | Day 1 PM — AD GPOs + share + audit |
 | `23_Day1_MA2_PKI.md` | Day 1 PM — Issuing CA + cert distribution |
+| `24_Day2_SecurityHardening.md` | **Day 2 — SOC build, OpenVPN, IR, forensics, AppSec (speculative until chief releases doc)** |
 | `30_Day1_MA2_Verification.md` | Day 1 PM — Functional tests from clients |
-| `40_Day2_CTF_Playbook.md` | Day 2 — Juice Shop methodology + ★1–★2 walkthroughs |
-| `41_Day3_CTF_Red.md` | Day 3 — Juice Shop ★3–★4 walkthroughs |
-| `42_Day4_CTF_Blue.md` | Day 4 — Juice Shop ★5–★6 walkthroughs |
+| `50_Day3_CTF_Playbook.md` | Day 3 morning — Juice Shop methodology + ★1–★2 |
+| `51_Day3_VulnHub_BootToRoot.md` | Day 3 afternoon — Boot-to-root playbook + 1st VulnHub VM |
+| `52_Day4_CTF_Hard.md` | Day 4 — Harder VulnHub walkthroughs + Juice Shop ★5–★6 |
 | `90_Practice_Schedule.md` | 2-week practice calendar |
 | `99_Marking_Map.md` | Master mark map — every aspect → which step solves it |

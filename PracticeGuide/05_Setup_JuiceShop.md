@@ -19,54 +19,37 @@ You **must** install Juice Shop locally on your Kali VM (or any Linux/Windows bo
 
 ---
 
-## Step 1 — Install (pick ONE of three methods)
+## Step 1 — Install (pick ONE of two methods)
 
-### Method A — Docker (recommended, 2 min)
-**Pre-req:** Docker Desktop on Windows or Docker on Linux.
+> Both methods need **Node.js 20.x LTS** installed first: download from `https://nodejs.org/` → install with default options → confirm with `node --version` (should print `v20.x.x`).
 
-Install Docker Desktop on Windows (free for personal use): `https://www.docker.com/products/docker-desktop/`
-
-Then:
-```bash
-docker pull bkimminich/juice-shop
-docker run --rm -d -p 3000:3000 --name juiceshop bkimminich/juice-shop
-```
-
-**Verify:** open `http://localhost:3000` in a browser — you should see the OWASP Juice Shop store.
-
-To stop:
-```bash
-docker stop juiceshop
-```
-
-To restart later:
-```bash
-docker run --rm -d -p 3000:3000 --name juiceshop bkimminich/juice-shop
-```
-
-> **Why Docker:** clean wipe between practice runs (`--rm` deletes everything when stopped, so the next run starts at challenge zero).
-
-### Method B — Pre-built ZIP (no Docker, 5 min)
-1. Go to GitHub releases: `https://github.com/juice-shop/juice-shop/releases/latest`
+### Method A — Pre-built ZIP (recommended, 5 min)
+1. Go to GitHub releases: `https://github.com/juice-shop/juice-shop/releases/latest`.
 2. Download the platform-appropriate archive:
    - Windows: `juice-shop-<version>_node20_windows_x64.zip`
    - Linux: `juice-shop-<version>_node20_linux_x64.tgz`
-3. Extract → open the folder in a terminal:
+3. Extract to a folder (e.g. `D:\juice-shop\`).
+4. Open a terminal in that folder:
    ```
-   cd juice-shop_<version>
+   cd D:\juice-shop\juice-shop_<version>
    npm start
    ```
-4. Browse to `http://localhost:3000`.
+5. Wait ~30 sec → browse to `http://localhost:3000`.
 
-### Method C — From source (15 min, only if A and B fail)
-Pre-req: Node.js 20.x LTS (`https://nodejs.org/`) + git.
+To stop: press **Ctrl+C** in the terminal.
+To restart: re-run `npm start`.
+
+### Method B — From source (15 min, only if Method A fails)
+Pre-req: Node.js 20.x LTS + git (`https://git-scm.com/downloads`).
 ```bash
 git clone https://github.com/juice-shop/juice-shop.git
 cd juice-shop
-npm install            # ~3 min
+npm install            # ~3 min — pulls all dependencies
 npm start              # ~30 sec to boot
 ```
 Open `http://localhost:3000`.
+
+> **Why these methods:** simpler than Docker for Windows users new to security tooling. No daemon to manage, no virtualisation conflicts with VMware. The trade-off is reset takes a couple more steps (Step 7 below) but it's not significant.
 
 ---
 
@@ -108,49 +91,77 @@ The whole book is in `*.md` files — readable offline in any editor.
 
 ---
 
-## Step 4 — CTFd export (so you can score yourself)
+## Step 4 — Score yourself (built-in score-board, no CTFd needed)
 
-Juice Shop ships a CTFd-compatible export. To set up a local CTFd + Juice Shop to mirror the competition platform:
+Juice Shop has its own built-in score-board at `http://localhost:3000/#/score-board`. Each challenge auto-ticks green the moment you trigger it. **For practice, this is enough** — you don't need a separate CTFd to track progress.
 
-### 4.1 Install CTFd locally (Docker)
-```bash
-git clone https://github.com/CTFd/CTFd.git
-cd CTFd
-docker-compose up -d
-```
-Open `http://localhost:8000` → first-run wizard, create admin account.
+### 4.1 Use the native score-board
+1. Bookmark `http://localhost:3000/#/score-board`.
+2. As you solve, the row turns green and shows the points you'd score in CTFd terms.
+3. Filter by category, ★ difficulty, or status (solved/unsolved) using the toolbar at the top.
 
-### 4.2 Generate Juice Shop's CTFd challenges file
+### 4.2 (Optional) Generate a flag-list file for offline reference
+If you want a text file with every challenge's expected flag (handy if a flag fails to register and you need to debug):
+
 ```bash
 npm install -g juice-shop-ctf-cli
 juice-shop-ctf
 ```
 Wizard prompts:
-- CTF framework: **CTFd**
+- CTF framework: pick anything (e.g. CTFd)
 - Juice Shop URL: `http://localhost:3000`
 - CTF key (any string): `team1-practice`
-- Insert hints: **paid** (so you practice both with and without hints)
+- Insert hints: **paid** (so you practice both with and without)
 - Country mapping: skip
-Output: `OWASP_Juice_Shop.<timestamp>.zip`
+Output: `OWASP_Juice_Shop.<timestamp>.zip` containing the flag list.
 
-### 4.3 Import into CTFd
-- CTFd admin → **Config → Backup → Import** → upload the zip → import challenges + flags.
-- Now your local CTFd has all Juice Shop challenges with their flags. You can practice against the same scoring system you'll see at the venue.
+> If you really want a separate CTFd UI later (when Marlon confirms the venue platform), the install isn't covered here — too many moving parts without Docker. The native score-board is functionally identical for practice.
 
 ---
 
-## Step 5 — Initial walkthrough (10 min, do this once)
+## Step 5 — Configure Burp Suite + Firefox (one-time, ~10 min)
 
-Familiarise both teammates with the UI:
+The single most important setup outside Juice Shop itself. Without this, you can't see/modify any HTTP traffic during the CTF.
+
+### 5.1 Set Firefox to use Burp as proxy
+**Why:** so all browser traffic flows through Burp where you can intercept/replay it.
+
+1. Open **Burp Suite Community** → *Temporary project → Use Burp defaults → Start Burp*.
+2. Burp UI → *Proxy → Proxy settings* → confirm a listener is on `127.0.0.1:8080` (default).
+3. In **Firefox**: *Settings → search "proxy" → Network Settings → Settings*.
+4. Choose **Manual proxy configuration**:
+   - HTTP Proxy: `127.0.0.1`  Port: `8080`
+   - ✅ Tick *"Also use this proxy for HTTPS"* (or *"Use this proxy server for all protocols"* depending on Firefox version).
+   - No Proxy For: leave empty (or `localhost` if you want to bypass for some local pages — but for Juice Shop you DO want it through Burp, so leave empty).
+5. OK to save.
+
+> 💡 **Better workflow:** install the **FoxyProxy** Firefox add-on (`https://addons.mozilla.org/firefox/addon/foxyproxy-standard/`) so you can toggle the proxy on/off with one click instead of editing settings each time.
+
+### 5.2 Install Burp's CA certificate in Firefox
+
+Without this, every HTTPS site shows a certificate error because Burp re-signs traffic with its own CA.
+
+1. With proxy active, in Firefox visit: `http://burp` (or `http://burpsuite`).
+2. Top-right corner of the page → click **CA Certificate** → downloads `cacert.der`.
+3. In Firefox: *Settings → Privacy & Security → scroll to Certificates → View Certificates → Authorities tab → Import*.
+4. Select the downloaded `cacert.der`.
+5. Tick ✅ **"Trust this CA to identify websites"** → OK.
+6. Restart Firefox.
+
+**Verify:** browse to `https://www.google.com` → should load with **no** certificate warning. (Burp's HTTP history will also show the request.)
+
+### 5.3 Initial walkthrough (do this once)
+
+Familiarise both teammates with Juice Shop's UI:
 
 1. **Browse the store** — note prices, products, search bar (top), basket, login.
-2. **Find the score-board** (★ challenge): `http://localhost:3000/#/score-board`. Bookmark it.
-3. **Open DevTools → Network tab** — refresh the page, observe `/api/Products`, `/api/Quantitys`, `/rest/user/whoami`, `/api/Users` etc.
-4. **Open Burp Suite** → set Firefox proxy to 127.0.0.1:8080 → Burp installs CA cert → re-load Juice Shop → confirm requests show in Burp's HTTP history.
-5. **Login as admin** with the easiest SQLi (you'll learn it formally in `40_…`):
+2. **Find the score-board** (★1 challenge): `http://localhost:3000/#/score-board`. Bookmark it.
+3. **DevTools → Network tab** — refresh the page, observe `/api/Products`, `/api/Quantitys`, `/rest/user/whoami`, `/api/Users` etc.
+4. **Burp Suite → Proxy → HTTP history** — confirm Juice Shop requests now appear (proxy + cert install both worked).
+5. **Login as admin** with the easiest SQLi:
    - Email: `' OR 1=1 --`
    - Password: anything
-   - → logged in as `admin@juice-sh.op`.
+   - → logged in as `admin@juice-sh.op`. The score-board ticks off the *"Login Admin"* challenge.
 
 ---
 
@@ -175,21 +186,21 @@ Familiarise both teammates with the UI:
 
 Juice Shop tracks your progress in a local SQLite file. To restart from scratch:
 
-### Docker
-```bash
-docker stop juiceshop          # the --rm flag wipes data
-docker run --rm -d -p 3000:3000 --name juiceshop bkimminich/juice-shop
+### From ZIP install
 ```
-
-### Source / ZIP
-```bash
-# Stop with Ctrl+C, then:
-rm data/juiceshop.sqlite       # if it exists
+# Stop with Ctrl+C in the terminal running 'npm start'
+# Then delete the local DB:
+del data\juiceshop.sqlite     # Windows
+# or:  rm data/juiceshop.sqlite   on Linux
+# Then start again:
 npm start
 ```
 
-### Restore from a snapshot
-Take a Kali VM snapshot **after** install but **before** practice, so you can go back to "fresh install + tools loaded" in one click.
+### From source install
+Same — `npm start` writes its DB into `data/juiceshop.sqlite`. Delete that file and re-run.
+
+### Tip — keep a clean copy
+After a fresh `npm install`, copy the whole folder to `juice-shop-CLEAN/`. To reset, delete the working folder, copy the clean one back, run `npm start`. Avoids re-running `npm install` every time.
 
 ---
 
@@ -211,12 +222,13 @@ Take a Kali VM snapshot **after** install but **before** practice, so you can go
 ## What to bring to competition
 
 USB contents:
-- [ ] Juice Shop offline ZIP (so you have it even if container registry is unreachable)
+- [ ] Juice Shop pre-built ZIP (Windows + Linux variants)
+- [ ] Node.js 20 LTS installer (Windows + Linux)
 - [ ] Pwning OWASP Juice Shop PDF + EPUB
-- [ ] CTFd local copy (in case practice between rounds)
 - [ ] Burp Suite Community installer
-- [ ] Firefox + Burp's CA cert
-- [ ] CyberChef offline build
+- [ ] Firefox installer + Burp's CA cert (`cacert.der`)
+- [ ] FoxyProxy add-on `.xpi` file (for offline install)
+- [ ] CyberChef offline build (`dist/` folder)
 - [ ] jwt_tool, sqlmap, ffuf
 
 ---

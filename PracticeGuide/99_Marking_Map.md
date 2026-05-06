@@ -132,39 +132,40 @@ Cross-reference of every aspect in `WSA2025_54_Cyber_Security_marking_scheme_Rev
 
 ---
 
-## Criterion B — Day 2 (Max 25) — CTF on OWASP Juice Shop (★1–★2)
+## Criterion B — Day 2 (Max 25) — Security Hardening: SOC + IR + Forensics + AppSec
 
-> 🎯 Confirmed by chief Marlon: CTF target = **OWASP Juice Shop**.
-> The HO-/CM- flag rows in the spreadsheet are **Lyon-2024 leftovers**. The chief will release the ASEAN→Juice-Shop flag mapping closer to competition. Until then, treat each Lyon row as a placeholder for a Juice Shop challenge of equivalent difficulty.
+> 🎯 Per chief Marlon's confirmation: Day 2 = **Security Hardening from scratch**, named tools = **Security Onion** + **OpenVPN**.
+> The marking-scheme title for this criterion (*"Cyber Security Incident Response, Digital Forensics, Application Security"*) matches a SOC-build module, not a CTF.
+> The HO-/CM- flag rows are **Lyon-2024 leftovers** — they will likely be replaced by Day 2 build/IR/forensics aspects when the official Day 2 doc lands.
 
-| Lyon-leftover row | K placeholder | Likely Juice Shop equivalent (★) | Solved by following |
+| Lyon-leftover row | K placeholder | Likely Day 2 deliverable | Solved by following |
 |---|---|---|---|
-| HO-01 to HO-07 (with H1/H2 bonuses) | ~13.0 | All Juice Shop ★1–★2 challenges | `40_…` |
-| CM-01 to CM-08 (with H1/H2 bonuses) | ~12.0 | Easy injection / sensitive data exposure / XSS challenges | `40_…` |
+| HO-01 to HO-07 (with H1/H2 bonuses) | ~13.0 | Security Onion deployment + Wazuh onboarding (Linux + Windows) + log-source forwarding | `24_…` Phase 1; `07_Setup_SecurityOnion.md` |
+| CM-01 to CM-08 (with H1/H2 bonuses) | ~12.0 | OpenVPN server install + cert chain + IR investigation + forensic findings + AppSec hardening | `24_…` Phases 2–5 |
 | **Criterion B total (paper)** | **25.0** | | |
 
-Track each challenge solved as: name / category / ★ / time / hints used.
+Track each step solved as: deliverable / outcome / time / observations.
 
 ---
 
-## Criterion C — Day 3 (Max 25) — Juice Shop ★3–★4
+## Criterion C — Day 3 (Max 25) — CTF: Juice Shop ★1–★4 and/or 1st VulnHub VM
 
-| Lyon-leftover row | K placeholder | Likely Juice Shop equivalent (★) | Solved by following |
+| Lyon-leftover row | K placeholder | Likely target | Solved by following |
 |---|---|---|---|
-| ODD Flag 01–12 (+ H1/H2) | ~17.5 | Auth bypasses, JWT, NoSQL, IDOR, file upload, security questions | `41_…` |
-| Cache-Cache Flag 01–03 | ~7.5 | XSS persistent, vulnerable-library reporting, forged coupons | `41_…` |
+| ODD Flag 01–12 (+ H1/H2) | ~17.5 | Mid VulnHub VM (e.g. DC-1, DC-2, Mr. Robot) — flags map to user shell + root + per-stage flags | `51_…` boot-to-root, `52_…` Walkthroughs 2,3,4 |
+| Cache-Cache Flag 01–03 | ~7.5 | Juice Shop ★1–★4 (login admin, reset Jim, UNION SQLi, JWT, vulnerable lib) | `50_…`, `51_…` Section X |
 | **Criterion C total** | **25.0** | | |
 
 ---
 
-## Criterion D — Day 4 (Max 25) — Juice Shop ★5–★6
+## Criterion D — Day 4 (Max 25) — Harder VulnHub VM and/or Juice Shop ★5–★6
 
-| Lyon-leftover row | K placeholder | Likely Juice Shop equivalent (★) | Solved by following |
+| Lyon-leftover row | K placeholder | Likely target | Solved by following |
 |---|---|---|---|
-| CS-01 to CS-15 + hint bonuses | 25.0 | Forged JWT, SSRF, XXE, Premium Paywall, RCE, B2B XML | `42_…` |
+| CS-01 to CS-15 + hint bonuses | 25.0 | Harder VulnHub (DC-3+, Kioptrix Level 1, Sunset series) + Juice Shop ★5–★6 (Forged JWT, SSRF, XXE, Premium Paywall) | `52_…` Walkthroughs 5,6 + Juice Shop hard section |
 | **Criterion D total** | **25.0** | | |
 
-> When chief releases the official flag mapping, replace the placeholder columns above with the actual `flag-id → challenge-name → ★` rows.
+> When chief releases the official Day 2 deliverables doc + flag→target mapping, replace the placeholder columns above with the actual rows.
 
 ---
 
@@ -188,8 +189,11 @@ Track each challenge solved as: name / category / ★ / time / hints used.
 | H120 says "france.jpg" — **wrong** | Use "manila.jpg" (per project) |
 | 4 missing aspects (domain pwd 8-char, FGPP 10-char, control GPO, registry GPO) | Implement them anyway — covered in `22_…` |
 | Day 4 exists in marking scheme but not in test plan | Practice for 4 days; if 3, you'll be over-prepared |
-| All B/C/D flag names are Lyon-leftover | Confirmed by chief: CTF = **Juice Shop**. Practice on Juice Shop, not Lyon answers. |
-| Chief has not yet released ASEAN flag → Juice Shop challenge mapping | Track every Juice Shop challenge you solve — when mapping drops, fill in placeholders above |
+| Day 2 = Security Hardening (per chief), not CTF | Build SOC + OpenVPN practice rig — see `24_…` and `07_…` |
+| All B/C/D flag names are Lyon-leftover | Confirmed by chief: Day 2 = SOC build, Days 3–4 CTF = **Juice Shop + VulnHub random pick** |
+| Chief has not yet released the Day 2 deliverables doc (no MA3-equivalent) | Build everything in `24_…` based on Marlon's named tools; verify when doc lands |
+| Chief has not yet released ASEAN flag → challenge mapping | Track every challenge you solve — when mapping drops, fill in placeholders above |
+| Day 2 may need internet during the build (Marlon mentioned it) | Confirmed reading: tools are **pre-staged on competition VMs**; internet only needed during organisers' prep AND during your at-home practice. No internet on competition day. |
 
 ---
 
