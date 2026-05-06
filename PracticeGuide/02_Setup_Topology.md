@@ -6,45 +6,116 @@ You only need Team 1's setup. The other two teams are not present.
 
 ---
 
-## A. Physical equipment (per Infrastructure-List)
+## A. Physical equipment (Team 1's actual rig)
 
-You should have brought to practice:
+You will use these physical pieces:
 
-| Item | Quantity |
-|---|---|
-| ESXi server (your own, with ESXi 8 installed) | 1 |
-| Workstation PC (laptop or desktop with VMware Workstation Pro) | 2 (one per teammate) |
-| Unmanaged 5/8-port switch | 1 |
-| RJ45 patch cords ≥ 3 m | 4 |
-| Power extension | as needed |
-| Optional: 2nd NIC USB-Ethernet adapter for each PC (so each PC has 2 NICs) | 2 |
+| Item | Quantity | Role |
+|---|---|---|
+| Desktop PC (PC1, PC2) — both running VMware Workstation Pro 17 on Windows | 2 | Teammates' workstations |
+| Desktop / system unit running ESXi 8 | 1 | Hosts all the practice VMs |
+| TP-Link 8-port unmanaged gigabit switch | 1 | Connects everything together |
+| TP-Link router (any model with WAN + LAN ports) | 1 | Provides internet during practice (download installers, updates) |
+| Cat 5e/6 straight-through ethernet cables | 4 minimum | Wiring |
+| Power extension / surge-protected power strip (≥ 8 outlets recommended) | 1 | Power for 3 PCs + 2 monitors + switch + router |
 
-> **Why 2 NICs per PC?** Per the topology diagram in `Infrastructure-List (2).docx`: one NIC reaches the team's ESXi (for VM consoles via VMware Workstation), the other NIC reaches the **competition LAN** (where the CTFD scoreboard lives). For solo practice, you can simulate the competition LAN with just the ESXi NIC and skip CTFD until Day 2 prep.
+> **About 2 NICs per PC:** the Infrastructure-List requires it for the *competition* (one NIC to team ESXi, one to the venue's CTFD LAN). For **solo Team 1 practice you can skip the 2nd NIC** — a single onboard NIC per PC handles everything below. Add a USB-Ethernet adapter (~₱500) only when you join the multi-team venue setup.
 
-### Wiring diagram (Team 1, practice)
+### Wiring diagram (Team 1, practice — 4 cables total)
 
 ```
-[ Laptop PC1 ]──┐
-                 ├──[ Unmanaged Switch ]──[ ESXi Server  192.168.10.10 ]
-[ Laptop PC2 ]──┘                                  │
-                                                    └── (later, at venue) → Team competition uplink
+                      Internet
+                         │
+                         ▼
+                ┌─────────────────┐
+                │ TP-Link Router  │
+                │  192.168.1.1    │
+                └────────┬────────┘
+                         │  Cable 1: router LAN → switch port 1
+                         ▼
+              ┌──────────────────────────┐
+              │ TP-Link 8-port Switch    │
+              └─┬──────┬──────┬──────────┘
+                │      │      │
+        Cable 2 │  C3  │  C4  │
+                ▼      ▼      ▼
+             ┌─────┐ ┌─────┐ ┌──────────────┐
+             │ESXi │ │ PC1 │ │     PC2      │
+             │svr  │ │     │ │              │
+             └─────┘ └─────┘ └──────────────┘
+              .10     .101    .102  ← typical DHCP-assigned addresses
 ```
 
-### IP plan for the team underlay (between PCs and ESXi)
+### Cable plan
 
-| Device | IP | Mask | Notes |
+| # | From | To |
+|---|---|---|
+| 1 | TP-Link router LAN port (1, 2, 3 or 4) | TP-Link switch port 1 |
+| 2 | Switch port 2 | ESXi server NIC |
+| 3 | Switch port 3 | PC1 onboard NIC |
+| 4 | Switch port 4 | PC2 onboard NIC |
+
+Switch ports 5–8 are spare (for future TV/CTFD scoreboard or 2nd NICs).
+
+> Modern devices have **Auto-MDIX** so straight-through cables work everywhere. No crossover cables needed.
+
+### Power-on order
+
+1. **TP-Link router** first → wait ~30 sec until WAN/Internet light is solid.
+2. **TP-Link switch** next → wait ~5 sec until link lights blink.
+3. **ESXi server** next → wait ~3 min until console shows the yellow ESXi splash with a `https://...` URL.
+4. **PC1 + PC2** last.
+
+This order ensures DHCP requests get answered cleanly.
+
+### IP addressing plan
+
+The TP-Link router runs DHCP automatically (default subnet usually `192.168.1.0/24` with router at `.1`). We let the PCs use DHCP (zero config) and **pin a static IP on ESXi only**, so the URL is always the same.
+
+| Device | IP method | Final IP | Why |
 |---|---|---|---|
-| ESXi mgmt vmk0 | 192.168.10.10 | /24 | Default ESXi mgmt |
-| Laptop PC1 NIC | 192.168.10.11 | /24 | Static, no GW |
-| Laptop PC2 NIC | 192.168.10.12 | /24 | Static, no GW |
+| TP-Link router | (its own default) | `192.168.1.1` | Gateway, DHCP, internet uplink |
+| ESXi server mgmt vmk0 | **Static** (set in ESXi console) | `192.168.1.10` | So `https://192.168.1.10/ui` always works |
+| PC1 onboard NIC | DHCP automatic | e.g. `192.168.1.101` | Just plug in, it works |
+| PC2 onboard NIC | DHCP automatic | e.g. `192.168.1.102` | Same |
 
-> Set static IPs on each laptop NIC: *Settings → Network & Internet → Ethernet → Edit IP settings → Manual → IPv4*. No gateway needed if you don't have internet.
+> Adjust the `.10`/`.101`/`.102` addresses to match your TP-Link router's actual subnet. Some TP-Link routers default to `192.168.0.0/24` — check the sticker on the router or open `192.168.0.1` / `192.168.1.1` in a browser from PC1 once it's plugged in.
 
-Verify by pinging from each laptop:
+### Set ESXi static IP (1 minute, once)
+
+At the ESXi server's physical console (the screen shows yellow/grey ESXi splash):
+1. **F2** → log in as `root`.
+2. *Configure Management Network → IPv4 Configuration*.
+3. Pick *Set static IPv4 address and network configuration*:
+   - IP: `192.168.1.10` (or `192.168.0.10` if your router uses that subnet)
+   - Subnet mask: `255.255.255.0`
+   - Default gateway: `192.168.1.1` (your TP-Link router IP)
+4. *DNS Configuration*:
+   - Primary DNS: `8.8.8.8`
+   - Secondary DNS: `1.1.1.1`
+   - Hostname: `esxi-team1`
+5. **Esc** → **Y** to apply and restart management network.
+6. Reserve `192.168.1.10` in the TP-Link router's DHCP table (web UI → DHCP → Address Reservation → enter the ESXi MAC + IP) so DHCP never tries to give that IP to anything else.
+
+### Verify everything
+
+From both PC1 and PC2, open Command Prompt:
+
 ```cmd
-ping 192.168.10.10
+ping 192.168.1.1         :: TP-Link router
+ping 192.168.1.10        :: ESXi server
+ping 8.8.8.8             :: internet (Google DNS)
+ping google.com          :: internet + DNS resolution
 ```
-Expected: replies in <5 ms. If not — check cables, switch power, NIC enabled.
+
+All four should reply in under 50 ms. If any fail:
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `ping 192.168.1.1` fails | PC NIC down, cable not seated, switch port dead | Check link lights on switch + PC; try another switch port |
+| `ping 192.168.1.10` fails | ESXi static IP not yet applied, or wrong subnet | Re-do "Set ESXi static IP" above |
+| `ping 8.8.8.8` fails | TP-Link router not connected to internet | Check WAN cable on router; reboot router |
+| `ping 8.8.8.8` works but `ping google.com` fails | DNS misconfigured on PC | Use DHCP on the PC NIC, or add `8.8.8.8` as primary DNS |
 
 ---
 
@@ -152,111 +223,84 @@ Internet (PG-Internet)              LAN (PG-LAN)
 
 ---
 
-## E. Practice-Mode physical setup (Team 1 alone, with internet)
+## E. Practice-mode notes (in addition to Section A above)
 
-The competition diagram in `Infrastructure-List (2).docx` shows 3 teams + a shared CTFD scoring server + a TV scoreboard, all on a competition LAN. For **solo Team 1 practice** you do NOT need the multi-team setup. Build this instead:
+The wiring + IP plan in Section A already matches Team 1's practice rig (TP-Link router + 8-port switch + 2 PCs + ESXi). Section A is the source of truth — these are just additional notes that apply to practice only.
 
-### E.1 Wiring (practice)
+### E.1 Internet uplink is for PRACTICE ONLY
 
-```
-                            ┌── (router / phone hotspot WAN)
-                            │   for downloading installers
-                            ▼
-                  ┌─────────────────────┐
-                  │   Home/team router  │
-                  └──────────┬──────────┘
-                             │
-                ┌────────────┴────────────┐
-                ▼                         ▼
-      ┌─────────────────┐       ┌─────────────────┐
-      │ ESXi Server     │       │  Unmanaged      │
-      │ 192.168.10.10   │───────│  Switch         │
-      └─────────────────┘       └─┬─────────┬─────┘
-                                  │         │
-                                  ▼         ▼
-                         ┌──────────┐  ┌──────────┐
-                         │ Laptop1  │  │ Laptop2  │
-                         │ NIC1     │  │ NIC1     │
-                         │ NIC2*    │  │ NIC2*    │
-                         └──────────┘  └──────────┘
-                          *NIC2 optional for practice
-```
+The TP-Link router brings internet so you can:
+- Download VMware Workstation Pro, ESXi ISO, OS ISOs.
+- Pull Wazuh agents, Security Onion ISO, VulnHub VMs, Juice Shop ZIP.
+- Update Kali, install packages with `dnf`/`apt` during VM build.
 
-> **Internet uplink is for practice ONLY.** During the actual competition there is **no internet** — every package needed is pre-staged on the supplied VMs (per MA2 lines 178/181 *"Packages have been pre-downloaded"*). For Day 2 (Security Hardening) the competition organisers pre-download Security Onion + OpenVPN packages too, so you don't need internet there either. You only need internet during *practice* to download all the tools/VMs/ISOs.
+**During the actual competition there is NO internet** — every package needed is pre-staged on the supplied VMs (per MA2 lines 178/181 *"Packages have been pre-downloaded"*). For Day 2 (Security Hardening), the competition organisers pre-download Security Onion + OpenVPN too. You only need internet during **practice** to download all the tools/VMs/ISOs to your USB stick.
 
-### E.2 What plugs into what
+> 💡 **Dry-run tip:** for your last 2 dry-runs, **unplug Cable 1** (router → switch) so PC1, PC2 and ESXi lose internet. This forces you to check that everything you need is already on local disk — exactly like competition day.
 
-| Cable | From | To |
-|---|---|---|
-| Cable 1 | Home router LAN port | Unmanaged switch port 1 |
-| Cable 2 | Switch port 2 | ESXi server NIC1 (mgmt) |
-| Cable 3 | Switch port 3 | Laptop1 NIC1 |
-| Cable 4 | Switch port 4 | Laptop2 NIC1 |
+### E.2 PC NIC settings (Windows 10/11)
 
-Power up the switch first, then ESXi, then laptops.
+DHCP from the TP-Link router is the simplest path:
 
-### E.3 Network settings on each laptop (Windows 10/11)
+1. *Settings → Network & Internet → Ethernet → IP assignment → Edit → Automatic (DHCP)* → Save.
+2. Verify in cmd:
+   ```cmd
+   ipconfig
+   ```
+   You should see an IPv4 address from the router's range (e.g. `192.168.1.101`) and a Default Gateway pointing to the router (`192.168.1.1`).
+3. Internet test:
+   ```cmd
+   ping 8.8.8.8
+   ping google.com
+   ```
+   Both should reply.
 
-For practice, set **NIC1 to DHCP** (so the home router gives it both an IP and an internet route). The static-IP approach in section A is for the **isolated competition rig** where there's no DHCP — for practice with internet, DHCP is simpler.
+### E.3 Optional: 2nd NIC per PC (matches competition exactly)
 
-1. *Settings → Network & Internet → Ethernet → NIC1 → IP assignment → Edit → Automatic (DHCP)* → Save.
-2. Verify: `ipconfig` shows an IP from your home router's range (e.g. 192.168.1.x) plus a Default Gateway.
-3. Verify internet: `ping 8.8.8.8` and `ping google.com` both reply.
+Competition uses 2 NICs per PC (one for team eSXi, one for competition LAN/CTFD). For solo practice you can:
+- **Skip it.** Use only the onboard NIC for everything. Simpler, fully functional.
+- **Buy USB-Ethernet adapters** (~₱500 each) — adds a 2nd NIC. Both NICs go into the same TP-Link switch during practice.
+- **Buy a PCIe NIC card** (~₱700 each) — cleaner because no USB cable hanging out the back.
 
-### E.4 ESXi management IP for practice
+For Day 1 + Day 2 + CTF practice — single onboard NIC is enough. The 2-NIC setup only matters when you join the multi-team venue.
 
-Either:
-- Let DHCP give ESXi an IP automatically (note it from the ESXi console at boot), then browse to `https://<dhcp-ip>/ui`.
-- Or set a static IP on ESXi (`F2` at console → Configure Management Network → IPv4 Configuration → Static → 192.168.1.10, mask 255.255.255.0, gateway 192.168.1.1). Adjust to match your home router's subnet.
+### E.4 Optional: TV / spare monitor for the CTFD scoreboard
 
-> Take note of the ESXi IP — you'll use it from both laptops to reach the web UI.
-
-### E.5 Optional: 2nd NIC per laptop (matches competition exactly)
-
-Competition uses 2 NICs per PC (one for team eSXi, one for competition LAN/CTFD). For practice you can:
-- **Skip it.** Use only NIC1 for everything. Simpler, fully functional for solo practice.
-- **Buy USB-Ethernet adapters** (~$10 each) — gives each laptop a 2nd NIC. Plug into the same switch. Then:
-  - NIC1 = team subnet (192.168.1.x with internet)
-  - NIC2 = "competition" subnet (could be a 2nd small switch, or another VLAN)
-- **Use a virtual NIC inside Workstation** — VMware Workstation can present a 2nd "host-only" virtual NIC. Cheapest option, but only works for VMs, not the host laptop's apps.
-
-> For Day 1 + Day 2 + CTF practice — single NIC1 is enough. The 2-NIC setup only matters for the spectator-scoreboard simulation (next section).
-
-### E.6 Optional: TV / spare monitor for the CTFD scoreboard
-
-The Infrastructure-List diagram shows a TV connected to a CTFD server displaying the scoreboard for spectators. You don't need this to *play* — but if you want a realistic dress-rehearsal, here are 3 options ranked by effort:
+The Infrastructure-List diagram shows a TV connected to the venue's CTFD server displaying the scoreboard for spectators. You don't need this to *play* — but if you want a realistic dress-rehearsal:
 
 | Option | What you need | Effort |
 |---|---|---|
-| **A — Skip it** | Nothing. Just open the CTFD UI in a browser tab on Laptop1 when you want to check score | None — recommended for normal practice |
-| **B — TV mirrored from a laptop** | Spare TV + HDMI cable + Laptop1's HDMI-out. Open CTFD scoreboard in a browser, drag to the TV display, fullscreen (F11) | 5 min |
-| **C — Dedicated CTFD box** | Spare PC or laptop running CTFD locally, plugged into the switch, with TV via HDMI showing the scoreboard. *(Setting up CTFd is non-trivial without Docker; for solo practice, use the Juice Shop native score-board instead — see `05_…` Step 4.)* | 30 min |
+| **A — Skip it** | Nothing. Use Juice Shop's native score-board (`/#/score-board`) on PC1 to track progress | None — recommended for normal practice |
+| **B — TV mirrored from a PC** | Spare TV + HDMI cable + PC1's HDMI-out. Open the score-board in a browser, drag to the TV display, fullscreen (F11) | 5 min |
+| **C — Dedicated scoreboard PC** | Spare PC or laptop showing the score-board fullscreen, plugged into the TP-Link switch with TV via HDMI | 30 min |
 
-**For local CTFD setup, see `05_Setup_JuiceShop.md` Step 4** — you already have the install steps. Just leave that PC running CTFD in the corner of the room with the TV plugged into it.
+> ⚠️ At the competition the TV scoreboard is provided by the organisers — don't bring your own. Section E.4 is purely for practice realism.
 
-> ⚠️ TV scoreboard at competition is provided by the organisers — don't bring your own. Section E.6 is purely for practice realism.
+### E.5 Summary — bare-minimum vs full-sim practice rig
 
-### E.7 Summary — the bare-minimum vs maximum practice rig
-
-| Item | Bare minimum (works for everything) | Full sim (matches competition feel) |
+| Item | Bare minimum (Team 1's plan, works for everything) | Full sim (matches competition feel) |
 |---|---|---|
-| Laptops | 2, single NIC each, DHCP | 2, dual NIC each, NIC1 team / NIC2 competition |
-| ESXi server | 1 with 1 NIC | 1 with 2 NICs (mgmt + VM traffic separated) |
-| Switch | 1 unmanaged 5-port | 1 per network (2 switches total) |
-| Internet | Yes (during build) | Yes (build) / disconnect for CTF dry-runs |
-| TV / monitor | None | HDMI from CTFD-running PC |
-| CTFD scoreboard | None — use Juice Shop's built-in score-board on Laptop1 | Optional dedicated PC (only for spectator dress-rehearsal) |
+| PCs | 2 desktops, single NIC each, DHCP | 2 desktops, dual NIC each |
+| ESXi server | 1 system unit, 1 NIC, static `192.168.1.10` | 1 system unit, 2 NICs (mgmt + VM separated) |
+| Switch | 1× TP-Link 8-port unmanaged | Same |
+| Router | 1× TP-Link (for internet during practice) | Same |
+| Internet | Yes (during build); disconnect for last 2 dry-runs | Same |
+| TV / monitor | Optional | HDMI from a scoreboard PC |
+| CTFD scoreboard | None — use Juice Shop's built-in score-board on PC1 | Optional dedicated scoreboard PC |
 
-Recommendation: start with **bare minimum** for Days 1 + 2 prep. Add CTFD/TV during Week 2 only if you want the dress-rehearsal experience.
+Your current plan = **bare minimum**, which is fine for everything below.
 
 ---
 
 ## F. Verification before moving on
 
-- [ ] All five port groups visible in ESXi UI under *Networking → Port groups*
-- [ ] Each laptop can reach ESXi web UI at `https://<esxi-ip>/ui`
-- [ ] Each laptop has internet (`ping google.com` works)
-- [ ] You understand which port group each VM should sit on
-- [ ] You've decided: bare-minimum or full-sim practice rig (both are fine)
+- [ ] TP-Link router has internet (Internet/WAN light is solid green)
+- [ ] All 4 cables seated; switch link lights blinking on ports 1–4
+- [ ] ESXi server boot screen shows `https://192.168.1.10/` (or whatever IP you set)
+- [ ] PC1 + PC2 each have a DHCP IP from the router (`ipconfig` shows `192.168.1.10x`)
+- [ ] From PC1: `ping 192.168.1.10` (ESXi) replies; `ping 8.8.8.8` (internet) replies
+- [ ] From PC1: browser opens `https://192.168.1.10/ui` and you can log in as `root`
+- [ ] All five ESXi port groups created (PG-Internet, PG-LAN, PG-DMZ, PG-Servers, PG-MA1-LAN) — see Section B above
+- [ ] You understand which port group each VM should sit on (Section C)
 
 If yes → next file: `03_Setup_VMs_MA1.md`.
