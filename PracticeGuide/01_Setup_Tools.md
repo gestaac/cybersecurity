@@ -8,9 +8,14 @@ This file lists everything you need to download and install **before** you build
 
 ## 0. Host hardware budget (read this first)
 
-You will run all the VMs on **one ESXi server**. Check it has enough resources before starting.
+Team 1's actual hardware:
+| Box | RAM | Disk | Role |
+|---|---|---|---|
+| **PC1** | 16 GB | 500 GB | Person A's workstation (Windows + VMware Workstation Pro) |
+| **PC2** | 16 GB | 500 GB | Person B's workstation (Windows + VMware Workstation Pro) |
+| **ESXi server** | TBD — see decision tree below | TBD | Hosts all the practice VMs |
 
-### Day-1 + CTF practice load (run together)
+### Per-VM resource table (full inventory)
 
 | VM | RAM | Disk |
 |---|---|---|
@@ -28,28 +33,87 @@ You will run all the VMs on **one ESXi server**. Check it has enough resources b
 | MA2 — Client2 (Win10) | 2 GB | 40 GB |
 | MA2 — Client3 (Win10) | 2 GB | 40 GB |
 | Kali Linux (attacker) | 4 GB | 80 GB |
-| **Sub-total (Day 1 + CTF)** | **~32 GB** *(WINSRV4 off → ~30 GB)* | **~610 GB** |
+| **MA1 + MA2 + Kali sub-total** | **~32 GB** *(WINSRV4 off → ~30 GB)* | **~610 GB** |
+| Security Onion (Day 2) | 16 GB | 300 GB |
+| OpenVPN service VM (Day 2) | 2 GB | 20 GB |
+| **Day-2 add-on** | **+18 GB** | **+320 GB** |
+| **Worst case (everything on at once)** | **~48 GB** | **~930 GB** |
 
-### Day-2 additional load
+### Disk reality check (with thin-provisioning)
+ESXi defaults all disks to **thin-provisioned**, meaning a 60 GB VM disk only consumes **what's actually written** (typically 15–25 GB). So 930 GB nominal ≈ **300 GB real disk usage** in practice.
 
-| VM | RAM | Disk |
+---
+
+### Decision tree — what ESXi server do you need?
+
+#### Scenario A — ESXi has ≥ 32 GB RAM and ≥ 1 TB SSD ✅ Ideal
+- Power on every VM as designed.
+- PC1 + PC2 are pure viewers. 16 GB / 500 GB each is plenty.
+- No special workarounds.
+
+#### Scenario B — ESXi has 16 GB RAM and 500 GB SSD ⚠️ Tight but workable
+You can still do everything; you just **never run two phases simultaneously**. Power discipline becomes a habit:
+
+| Session | Power on | RAM used |
 |---|---|---|
-| Security Onion (Eval) | 16 GB | 300 GB |
-| OpenVPN service VM (CentOS) | 2 GB | 20 GB |
-| **Sub-total (Day 2)** | **18 GB** | **320 GB** |
+| MA1 morning | DC.grimshay + www + AMClient1 + AMClient2 | ~10 GB |
+| MA2 afternoon | pfSense + WINSRV1 + WINSRV3 + LINSRV1 + Client1 + Client2 + Client3 (skip ISP/WINSRV4) | ~16 GB |
+| Day 2 SOC | Security Onion + 1 client to send logs | ~18 GB ← **does NOT fit on 16 GB ESXi** |
+| CTF | Kali + 1 VulnHub VM | ~5 GB |
 
-### Recommended host specs
+**Day 2 fits poorly here.** Mitigations:
+- Run Security Onion on **PC1** instead (16 GB, just barely — disable Windows fast-startup, close everything else, give SO 12 GB).
+- Or downsize SO to 12 GB RAM in the VM settings — less responsive but works.
+- Or accept that Day 2 mock-runs will be on a smaller scale than competition.
 
-| Practice mode | RAM | Disk | CPU |
-|---|---|---|---|
-| **Day-1 + CTF only** (most common; can shut down some VMs to save RAM) | **32 GB minimum, 64 GB ideal** | **800 GB SSD** | **8 cores** |
-| **Day-2 too (Security Onion alongside)** | **64 GB minimum** | **1.2 TB SSD** | **8+ cores** |
+Disk: 500 GB on ESXi → with thin-prov, real usage ~250–300 GB. Manageable. Delete old snapshots aggressively.
 
-> 🔑 **Memory tactics if you're tight:**
+#### Scenario C — ESXi is older / weaker than your PCs ⚡ Split workload across 3 boxes
+If your ESXi server is the weakest box (say 8 GB RAM), flip the model:
+
+- **ESXi server**: runs MA1 stack only (light VMs, ~10 GB total).
+- **PC1**: runs MA2 stack via VMware Workstation Pro (16 GB available locally).
+- **PC2**: runs Kali + Juice Shop + occasional VulnHub VMs locally.
+
+Each PC has 16 GB RAM and 500 GB → comfortable to host one slice of the lab. Trade-off: you lose the "all VMs in one place" simplicity and the Infrastructure-List authenticity (competition uses one ESXi per team).
+
+---
+
+### What to do RIGHT NOW
+
+1. **Find out your ESXi server's RAM and disk.** Boot it, look at the splash, or check `dmidecode` on Linux / Task Manager.
+2. Match it to A / B / C above.
+3. If **A**: proceed normally.
+4. If **B**: read the "Power discipline" rules below before practising.
+5. If **C**: tell me — I'll add a Scenario-C split-workload supplement to the guide.
+
+---
+
+### Power discipline rules (apply to Scenario B and tight setups)
+
+- **Always shut down VMs you're not actively using.** RAM is the constraint, not disk.
+- **WINSRV4 is OFF by default.** Only power on when you need to sign a CSR (~5 min once).
+- **MA1 set OFF** once you've moved to MA2 practice for the day.
+- **Kali OFF** until you're ready for CTF (Day 3+).
+- **Security Onion runs alone**, with only the 1–2 VMs it needs to monitor.
+- **Take VM snapshots before shutting down** — so you can resume the exact state next session.
+
+---
+
+### Thin-provisioning vs thick (disk choice when creating VMs)
+
+When ESXi prompts during VM creation:
+| Option | When to use |
+|---|---|
+| **Thin Provision** ✅ default | Use this for everything. Disk grows as needed. |
+| Thick Provision Lazy Zeroed | Only if you have abundant disk and want max performance. |
+| Thick Provision Eager Zeroed | Skip — for production clusters only. |
+
+> 🔑 **Memory tactics summary** (apply always):
 > - Power off WINSRV4 except when signing certs.
-> - Power off MA1 VMs once you've moved to MA2 practice (different vSwitches anyway).
+> - Power off MA1 VMs once you've moved to MA2 practice.
 > - For Day 2 practice, shut down all MA2 VMs except the ones Security Onion is monitoring.
-> - Thin-provision all VMware disks (default in ESXi) — totals above are *max*, real usage is much lower.
+> - Thin-provision all VMware disks (default in ESXi) — disk usage is much lower than the table totals suggest.
 
 ---
 

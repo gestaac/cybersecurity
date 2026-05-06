@@ -125,7 +125,7 @@ Each session:
 ## What to bring to the competition
 
 - USB stick (per Infrastructure-List): 4 patch cords, your laptop with VMware Workstation, your ESXi server, unmanaged switch, power extension.
-- Backup USB(s) — minimum **128 GB total** — with:
+- Backup USB(s) — minimum **128 GB total** (or use a **1 TB external SSD** — recommended given that PCs only have 500 GB internal each) — with:
   - All Day-1 OS ISOs (pfSense, CentOS, Win Server 2022, Win 10).
   - **Security Onion 2.4 ISO (~9 GB).**
   - Kali Linux VM image.
