@@ -35,30 +35,109 @@ sudo so-status
 **Expected:** every component `OK`.
 **Marks:** [Crit B placeholder] SOC platform deployed.
 
-### Step 1.2 — Onboard a Linux host as a Wazuh agent
+### Step 1.2 — Onboard a Linux host as a Wazuh agent (full procedure)
 **Why:** Wazuh = HIDS = file-integrity + log shipping from servers.
-**Where:** SSH to LinSRV1 (port 2022 from Day 1's hardening).
-**Commands:** Get the agent install command from the SOC UI → *Downloads → Wazuh Agent → Linux*. Typical:
+**Where:** SSH to LinSRV1 from PC1 — `ssh C1@manila.com@192.168.1.10 -p 2022` (port 2022 from Day 1's hardening).
+
+#### 1.2.1 — Get the agent installer
+The simplest path is to copy the RPM you pre-staged on USB (per `01_…` Section 5.6) into LinSRV1, e.g. via WinSCP:
 ```bash
-curl -so wazuh-agent.rpm https://<so-ip>/files/wazuh-agent.rpm
-sudo rpm -ivh wazuh-agent.rpm
-sudo /var/ossec/bin/agent-auth -m <so-ip>
-sudo systemctl enable --now wazuh-agent
+# On LinSRV1
+ls /tmp/wazuh-agent-4.x.x-1.x86_64.rpm    # confirm it's there
 ```
-**Verify:** SOC UI → *Wazuh* → agent shows **Active**.
-**Marks:** [Crit B placeholder] Wazuh onboarded.
+Or if internet is available during build (per chief's note that Day 2 packages may be pre-staged, but practice has internet):
+```bash
+sudo rpm --import https://packages.wazuh.com/key/GPG-KEY-WAZUH
+sudo dnf install -y https://packages.wazuh.com/4.x/yum/wazuh-agent-4.x.x-1.x86_64.rpm
+```
+
+#### 1.2.2 — Configure the manager IP in `/var/ossec/etc/ossec.conf`
+**Note:** the SO box's IP. Substitute in the placeholder below.
+```bash
+sudo sed -i 's|<address>MANAGER_IP</address>|<address>192.168.1.50</address>|' \
+    /var/ossec/etc/ossec.conf
+```
+Verify the change:
+```bash
+sudo grep -A1 "<server>" /var/ossec/etc/ossec.conf | head -5
+# Should print:
+#   <server>
+#       <address>192.168.1.50</address>
+```
+
+#### 1.2.3 — Register the agent with the SO manager
+On Security Onion:
+```bash
+sudo so-wazuh-agent-list                  # show currently registered agents
+sudo /var/ossec/bin/manage_agents
+# Pick (A)dd → name 'linsrv1' → IP 192.168.1.10
+# Note the **agent ID** (e.g. 002) printed back
+# Pick (E)xtract → enter agent ID → it prints a one-time KEY (long string)
+# Save the KEY to clipboard or paste-buffer.
+```
+
+Back on LinSRV1, register with the key:
+```bash
+sudo /var/ossec/bin/manage_agents
+# Pick (I)mport → paste the KEY → confirm
+# Pick (Q)uit
+```
+
+#### 1.2.4 — Start + enable the agent
+```bash
+sudo systemctl enable --now wazuh-agent
+sudo systemctl status wazuh-agent --no-pager | head -20
+# Expected: 'active (running)' + connection to manager IP shown
+```
+
+#### 1.2.5 — Verify in SOC UI
+1. Browse to SO web UI → log in → *Wazuh → Agents*.
+2. Look for `linsrv1` → status: **Active** (green).
+3. Click the agent → *Inventory* → see the host's OS/users/ports.
+
+**Common failures:**
+| Symptom | Fix |
+|---|---|
+| Agent shows "Disconnected" | Firewalld blocking outbound — `sudo firewall-cmd --add-port=1514/udp --add-port=1515/tcp --permanent && sudo firewall-cmd --reload` |
+| "ERROR: Unable to connect to manager" | Wrong manager IP in ossec.conf, or SO firewall blocking — check `sudo so-allow` on SO |
+| Agent never registers | Agent's name already in use — pick a different one |
+
+**Marks:** [Crit B placeholder] Linux Wazuh agent onboarded.
 
 ### Step 1.3 — Onboard Windows (WINSRV1) as Wazuh agent
-**Where:** WINSRV1 PowerShell as Administrator.
-**Commands:**
+**Where:** WINSRV1 console as `MANILA\Administrator`. Open **PowerShell as Administrator**.
+
+#### 1.3.1 — Get the MSI
+Either copy `wazuh-agent-4.x.x-1.msi` from your USB into `C:\Temp\` via SMB, or download:
 ```powershell
-# Download installer from SO
-Invoke-WebRequest -Uri "https://<so-ip>/files/wazuh-agent.msi" -OutFile wazuh-agent.msi
-msiexec /i wazuh-agent.msi /q WAZUH_MANAGER="<so-ip>"
-Start-Service WazuhSvc
+$msi = "C:\Temp\wazuh-agent.msi"
+Invoke-WebRequest -Uri "https://packages.wazuh.com/4.x/windows/wazuh-agent-4.x.x-1.msi" -OutFile $msi
 ```
-**Verify:** SOC UI → *Wazuh* → WINSRV1 agent active.
-**Marks:** [Crit B placeholder] Windows onboarded.
+
+#### 1.3.2 — Install with manager IP set inline
+```powershell
+$so = "192.168.1.50"
+msiexec.exe /i C:\Temp\wazuh-agent.msi /q WAZUH_MANAGER="$so" WAZUH_REGISTRATION_SERVER="$so" WAZUH_AGENT_NAME="winsrv1"
+```
+Wait ~30 sec. The MSI runs `agent-auth.exe` automatically against the SO manager.
+
+#### 1.3.3 — Start + verify
+```powershell
+Start-Service WazuhSvc
+Get-Service WazuhSvc
+# Expected: Status = Running
+```
+Tail the log for the registration line:
+```powershell
+Get-Content "C:\Program Files (x86)\ossec-agent\ossec.log" -Tail 30
+# Look for: "Connected to enrollment service" and "Connection accepted"
+```
+
+#### 1.3.4 — Verify in SOC UI
+SO web UI → Wazuh → Agents → see `winsrv1` Active.
+Trigger a quick test: on WINSRV1, edit any file in `C:\Windows\System32\drivers\etc\hosts` → save → Wazuh should fire **rule 550** (file integrity changed). Check SOC UI → Alerts within 1 min.
+
+**Marks:** [Crit B placeholder] Windows Wazuh agent onboarded.
 
 ### Step 1.4 — Forward pfSense logs (syslog → SO)
 **Where:** pfSense web UI.
@@ -75,14 +154,49 @@ Start-Service WazuhSvc
 
 ## Phase 2 — OpenVPN service (Person B)
 
-This is an OpenVPN install **on a Linux server**, separate from the pfSense one in MA2. Likely the chief will provide a fresh CentOS VM.
+This is an OpenVPN install **on a Linux server**, separate from the pfSense one in MA2. Likely the chief will provide a fresh CentOS VM. For practice we build it ourselves.
+
+### Step 2.0 — Create the OpenVPN service VM (practice prep)
+
+#### Option A — On ESXi
+1. ESXi web UI → Virtual Machines → **Create / Register VM** → *Create a new virtual machine*.
+2. Name: `openvpn-srv`, Compatibility: ESXi 8.0, Guest family: Linux, Version: CentOS 9 (64-bit).
+3. Datastore: `datastore1`.
+4. Customize:
+   - CPU: 1 core
+   - RAM: 2 GB
+   - Disk: 20 GB, **Thin Provision**
+   - Network adapter: choose `PG-Servers` (so it can talk to AD if needed) or whichever subnet the chief specifies; for our practice put it on `PG-Servers` 192.168.2.x with a static `.20`.
+   - CD/DVD: mount the CentOS Stream 9 ISO from your datastore (upload via *Datastores → datastore1 → Upload*)
+5. Power on → finish CentOS install (Server with GUI is fine; Minimal is leaner).
+6. Set hostname `openvpn-srv` and static IP:
+   ```bash
+   sudo hostnamectl set-hostname openvpn-srv
+   sudo nmcli con mod ens160 ipv4.addresses 192.168.2.20/24 ipv4.gateway 192.168.2.254 ipv4.dns 192.168.2.10 ipv4.method manual
+   sudo nmcli con up ens160
+   ```
+7. Snapshot the VM as `openvpn-base`.
+
+#### Option B — On VMware Workstation (single-PC practice)
+Same specs (1 vCPU, 2 GB RAM, 20 GB thin disk) but:
+- Network: VMnet13 (PG-Servers equivalent)
+- Static IP: 192.168.2.20 (gateway 192.168.2.254 if pfSense is also on VMnet13, or 192.168.1.1 if pointing back at TP-Link router during Day 2 standalone practice).
+Snapshot.
+
+> **Quickest path:** clone your Day 1 LinSRV1 snapshot, change hostname + IP, and you have an OpenVPN base in 2 min.
 
 ### Step 2.1 — Install OpenVPN + Easy-RSA
-**Pre-req:** internet to the VM (during competition this is pre-staged).
-**Where:** SSH to the OpenVPN VM as root.
+**Pre-req:** internet to the VM (during practice you have it; on competition day organisers pre-stage the RPMs).
+**Where:** SSH to the OpenVPN VM as root: `ssh root@192.168.2.20`.
+
 ```bash
 sudo dnf install -y epel-release
 sudo dnf install -y openvpn easy-rsa
+```
+
+**If no internet (offline competition mode):** copy the staged RPMs to the VM, then:
+```bash
+sudo dnf localinstall -y /tmp/wheels/openvpn*.rpm /tmp/wheels/easy-rsa*.rpm
 ```
 
 ### Step 2.2 — Generate the PKI

@@ -168,7 +168,9 @@ Create these custom VMnets (click *Add Network*):
 | **VMnet11** | Host-only | `172.16.100.0/24` | MA2 LAN: Client1, Client2, pfSense LAN | `PG-LAN` |
 | **VMnet12** | Host-only | `192.168.1.0/24` | MA2 DMZ: LinSRV1, pfSense DMZ | `PG-DMZ` |
 | **VMnet13** | Host-only | `192.168.2.0/24` | MA2 Servers: WinSRV1/3/4, pfSense Servers | `PG-Servers` |
-| **VMnet14** | Host-only | `172.16.100.0/24` | MA1: DC.grimshay, www, AMClient1/2 | `PG-MA1-LAN` |
+| **VMnet14** | Host-only | `10.10.10.0/24` | MA1: DC.grimshay, www, AMClient1/2 | `PG-MA1-LAN` |
+
+> ⚠️ **Note on subnets:** the original `02_Setup_Topology.md` (3-PC ESXi version) reuses `172.16.100.0/24` for both MA1 and MA2 LAN — that works on ESXi because the two port groups are on different vSwitches and never bridge. To keep things cleaner here on a single host, I've moved MA1 LAN to `10.10.10.0/24`. When you build MA1 VMs from `03_Setup_VMs_MA1.md`, **substitute the IPs** as shown in the override table at the bottom of section D.3.
 
 For each one:
 1. Click *Add Network* → choose VMnet number → OK.
@@ -194,6 +196,21 @@ When the guide says... | Do this in Workstation
 *ESXi snapshot* | VM menu → *Snapshot → Take Snapshot…*
 
 The MA1/MA2 build files (`03_…` and `04_…`) reference port groups by name — substitute VMnet numbers as above.
+
+### D.4 IP overrides for MA1 (single-PC mode only)
+
+Because MA1 LAN moved to `10.10.10.0/24` here (instead of `172.16.100.0/24`), substitute these IPs when following `03_Setup_VMs_MA1.md`:
+
+| VM | IP in `03_…` (3-PC mode) | IP to use here (single-PC mode) |
+|---|---|---|
+| DC.grimshay.local | 172.16.100.10 | **10.10.10.10** |
+| www.grimshay.ca | 172.16.100.13 | **10.10.10.13** |
+| AMClient1 | 172.16.100.1 | **10.10.10.1** |
+| AMClient2 | 172.16.100.2 | **10.10.10.2** |
+
+DNS records, Apache vhost, and any other config that references these IPs needs the same substitution. The MA2 LAN (Client1/Client2 on VMnet11) keeps `172.16.100.x` unchanged — no overlap because they're different VMnets.
+
+> When you migrate later to the 3-PC ESXi rig (per Section H), you can either keep the `10.10.10.x` IPs or re-IP back to `172.16.100.x` — either works because MA1 and MA2 sit on different ESXi port groups.
 
 ---
 
