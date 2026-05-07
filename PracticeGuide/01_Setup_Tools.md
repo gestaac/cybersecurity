@@ -19,25 +19,23 @@ Team 1's actual hardware:
 
 | VM | RAM | Disk |
 |---|---|---|
-| MA1 — DC.grimshay.local | 4 GB | 60 GB |
-| MA1 — www.grimshay.ca (CentOS) | 2 GB | 20 GB |
-| MA1 — AMClient1 (Win10) | 2 GB | 40 GB |
-| MA1 — AMClient2 (Win10) | 2 GB | 40 GB |
-| MA2 — ISP (CentOS) | 1 GB | 10 GB |
-| MA2 — pfSense | 2 GB | 20 GB |
-| MA2 — WINSRV1 (DC) | 4 GB | 80 GB |
-| MA2 — WINSRV3 (CA) | 3 GB | 60 GB |
-| MA2 — WINSRV4 (Root CA, off most of time) | 2 GB | 60 GB |
-| MA2 — LINSRV1 (CentOS) | 2 GB | 20 GB |
-| MA2 — Client1 (Win10) | 2 GB | 40 GB |
-| MA2 — Client2 (Win10) | 2 GB | 40 GB |
-| MA2 — Client3 (Win10) | 2 GB | 40 GB |
+| **Day 1 — MA1 (CMS pentest):** | | |
+| CMS target VM (Drupal 7 / Linux) | 2 GB | 20 GB |
 | Kali Linux (attacker) | 4 GB | 80 GB |
-| **MA1 + MA2 + Kali sub-total** | **~32 GB** *(WINSRV4 off → ~30 GB)* | **~610 GB** |
-| Security Onion (Day 2) | 16 GB | 300 GB |
-| OpenVPN service VM (Day 2) | 2 GB | 20 GB |
-| **Day-2 add-on** | **+18 GB** | **+320 GB** |
-| **Worst case (everything on at once)** | **~48 GB** | **~930 GB** |
+| **Day 2 — MA2 (Security Hardening):** | | |
+| ISP (CentOS) | 1 GB | 10 GB |
+| pfSense | 2 GB | 20 GB |
+| WINSRV1 (DC) | 4 GB | 80 GB |
+| WINSRV3 (CA) | 3 GB | 60 GB |
+| WINSRV4 (Root CA, off most of time) | 2 GB | 60 GB |
+| LINSRV1 (CentOS) | 2 GB | 20 GB |
+| Client1 (Win10) | 2 GB | 40 GB |
+| Client2 (Win10) | 2 GB | 40 GB |
+| Client3 (Win10) | 2 GB | 40 GB |
+| **Day 3 — CTF (run one VM at a time):** | | |
+| 1× VulnHub VM (varies) | 1–2 GB | 4 GB |
+| Juice Shop (runs on host or Kali, no separate VM) | — | 1 GB |
+| **Total nominal** *(MA2 active + Kali, WINSRV4 off)* | **~22 GB** | **~410 GB** |
 
 ### Disk reality check (with thin-provisioning)
 ESXi defaults all disks to **thin-provisioned**, meaning a 60 GB VM disk only consumes **what's actually written** (typically 15–25 GB). So 930 GB nominal ≈ **300 GB real disk usage** in practice.
@@ -56,17 +54,11 @@ You can still do everything; you just **never run two phases simultaneously**. P
 
 | Session | Power on | RAM used |
 |---|---|---|
-| MA1 morning | DC.grimshay + www + AMClient1 + AMClient2 | ~10 GB |
-| MA2 afternoon | pfSense + WINSRV1 + WINSRV3 + LINSRV1 + Client1 + Client2 + Client3 (skip ISP/WINSRV4) | ~16 GB |
-| Day 2 SOC | Security Onion + 1 client to send logs | ~18 GB ← **does NOT fit on 16 GB ESXi** |
-| CTF | Kali + 1 VulnHub VM | ~5 GB |
+| Day 1 — MA1 pentest | CMS target + Kali | ~6 GB |
+| Day 2 — MA2 hardening | pfSense + WINSRV1 + WINSRV3 + LINSRV1 + Client1 + Client2 (skip ISP/WINSRV4 unless testing) | ~14 GB |
+| Day 3 — CTF | Kali + 1 VulnHub VM | ~6 GB |
 
-**Day 2 fits poorly here.** Mitigations:
-- Run Security Onion on **PC1** instead (16 GB, just barely — disable Windows fast-startup, close everything else, give SO 12 GB).
-- Or downsize SO to 12 GB RAM in the VM settings — less responsive but works.
-- Or accept that Day 2 mock-runs will be on a smaller scale than competition.
-
-Disk: 500 GB on ESXi → with thin-prov, real usage ~250–300 GB. Manageable. Delete old snapshots aggressively.
+Disk: 500 GB on ESXi → with thin-prov, real usage ~150–250 GB. Manageable. Delete old snapshots aggressively.
 
 #### Scenario C — ESXi is older / weaker than your PCs ⚡ Split workload across 3 boxes
 If your ESXi server is the weakest box (say 8 GB RAM), flip the model:
@@ -93,9 +85,8 @@ Each PC has 16 GB RAM and 500 GB → comfortable to host one slice of the lab. T
 
 - **Always shut down VMs you're not actively using.** RAM is the constraint, not disk.
 - **WINSRV4 is OFF by default.** Only power on when you need to sign a CSR (~5 min once).
-- **MA1 set OFF** once you've moved to MA2 practice for the day.
-- **Kali OFF** until you're ready for CTF (Day 3+).
-- **Security Onion runs alone**, with only the 1–2 VMs it needs to monitor.
+- **CMS target + Kali OFF** once you've moved past Day 1 practice.
+- **Skip ISP** during MA2 unless specifically testing Internet-bound rules.
 - **Take VM snapshots before shutting down** — so you can resume the exact state next session.
 
 ---
@@ -111,8 +102,8 @@ When ESXi prompts during VM creation:
 
 > 🔑 **Memory tactics summary** (apply always):
 > - Power off WINSRV4 except when signing certs.
-> - Power off MA1 VMs once you've moved to MA2 practice.
-> - For Day 2 practice, shut down all MA2 VMs except the ones Security Onion is monitoring.
+> - Power off MA1 VMs once you've moved to MA2 (Day 2) practice.
+> - Power off MA2 VMs before doing CTF / Day 3 practice — only Kali + 1 VulnHub VM needed.
 > - Thin-provision all VMware disks (default in ESXi) — disk usage is much lower than the table totals suggest.
 
 ---
@@ -158,7 +149,7 @@ When ESXi prompts during VM creation:
 ### 3.1 Web + remote-access
 | Tool | Why | Source |
 |---|---|---|
-| **Google Chrome** | Required for "Chrome enterprise" GPO test | `https://www.google.com/chrome/` |
+| **Google Chrome** | General browser for client-side verification | `https://www.google.com/chrome/` |
 | **Mozilla Firefox** | Backup browser for cert inspection | `https://www.mozilla.org/firefox/` |
 | **PuTTY 0.79+** | SSH to LinSRV1 over port 2022 | `https://www.putty.org/` |
 | **WinSCP** | File copy to LinSRV1 | `https://winscp.net/` |
@@ -169,15 +160,13 @@ When ESXi prompts during VM creation:
 | Tool | Why | Source |
 |---|---|---|
 | **Wireshark 4.x** | Packet capture for troubleshooting LDAP/HTTPS | `https://www.wireshark.org/` |
-| **Nmap + Zenmap** | XMAS scan from Client3 to test Snort | `https://nmap.org/download.html` |
+| **Nmap + Zenmap** | FIN scan from Client3 to test Snort (MA2 PDF page 10) | `https://nmap.org/download.html` |
 
 ### 3.3 Microsoft management bundles
 | Tool | Why | Source |
 |---|---|---|
 | **RSAT (Remote Server Administration Tools)** | If you ever manage AD from a Win10 client | `Settings → Apps → Optional Features → Add → RSAT` |
-| **Google Chrome Enterprise Bundle 64** | Provides ADMX/ADML files for the "google" GPO | `https://chromeenterprise.google/intl/en_us/browser/download/` (choose **Chrome Enterprise Bundle**, .zip with admx) |
 
-> The googleChromeEnterpriseBundle64.zip is also pre-staged in the official competition's domain administrator's `Documents` folder per MA2 line 204 — but it's safer to have your own copy.
 
 ---
 
@@ -261,19 +250,16 @@ sudo apt install -y crackmapexec impacket-scripts smbclient enum4linux \
 
 ## 5.6 Day-2 (Security Hardening) tooling
 
-| Item | Why | Source | Approx size |
-|---|---|---|---|
-| **Security Onion 2.4 ISO** | Day 2 SOC platform (Suricata + Zeek + Wazuh + ELK + SOC web UI) | `https://securityonionsolutions.com/software` → links to GitHub releases at `https://github.com/Security-Onion-Solutions/securityonion/releases` | ~9 GB |
-| **Wazuh Agent (Linux RPM)** | HIDS endpoint on CentOS hosts | `https://documentation.wazuh.com/current/installation-guide/wazuh-agent/wazuh-agent-package-linux.html` (RPM for RHEL/CentOS) | ~50 MB |
-| **Wazuh Agent (Windows MSI)** | HIDS endpoint on Windows hosts | `https://documentation.wazuh.com/current/installation-guide/wazuh-agent/wazuh-agent-package-windows.html` | ~25 MB |
-| **OpenVPN server packages (CentOS)** | Day 2 standalone OpenVPN install | EPEL repo (already pulled when you `dnf install -y epel-release openvpn easy-rsa`) | included |
-| **NetworkMiner** (free) | Forensic GUI for PCAP — bonus for Day 2 forensics phase | `https://www.netresec.com/?page=NetworkMiner` | ~50 MB |
+**Day 2 (MA2 — Security Hardening) tooling is already covered above:**
+- pfSense 2.7.2 ISO (Section 2)
+- CentOS Stream 9 ISO (Section 2) — for LINSRV1
+- Win Server 2022 Eval (Section 2) — for WINSRV1/3/4
+- Win 10 Eval (Section 2) — for Client1/2/3
+- OpenVPN Connect (Section 3.1) — for Client3 dial-in
+- Snort + OpenVPN packages on pfSense — pre-staged in MA2 PDF (no separate download)
+- Wireshark + PuTTY (Section 3.2) — for client-side troubleshooting
 
-### Day-2 minimum download list (USB)
-- [ ] Security Onion ISO (~9 GB)
-- [ ] Wazuh agent RPM (Linux)
-- [ ] Wazuh agent MSI (Windows)
-- [ ] NetworkMiner ZIP (optional)
+> No additional Day-2-only tools required. Marlon's earlier "Security Onion + OpenVPN" mention referred to the OpenVPN that's already in MA2 — there's no separate SOC module.
 
 ---
 
@@ -290,13 +276,12 @@ sudo apt install -y crackmapexec impacket-scripts smbclient enum4linux \
 
 ## 7. Pre-flight checklist (tick before moving to `02_Setup_Topology.md`)
 
-### Day-1 (MA1/MA2) prep
-- [ ] VMware Workstation 17 installed + licensed on team laptop
-- [ ] ESXi 8 installed on team server, web UI reachable on `https://<esxi-ip>/ui`
-- [ ] All 4 OS ISOs downloaded to `D:\ISO\`
-- [ ] Chrome, Firefox, PuTTY, WinSCP, Wireshark, Nmap on competitor PCs
-- [ ] Chrome Enterprise Bundle .zip saved (for `googleChromeEnterpriseBundle64`)
-- [ ] OpenVPN Connect installed on Client3
+### Day 1 + Day 2 prep (MA1 pentest + MA2 hardening)
+- [ ] VMware Workstation 17 installed + licensed on team PCs
+- [ ] ESXi 8 installed on team server (3-PC mode) OR VMnets configured (single-PC mode per `02b_…`)
+- [ ] All 4 OS ISOs downloaded to `D:\ISO\` (pfSense, CentOS Stream 9, Win Server 2022 Eval, Win 10 Eval)
+- [ ] Chrome, Firefox, PuTTY, WinSCP, Wireshark, Nmap installed
+- [ ] OpenVPN Connect installed (for Client3 dial-in test)
 
 ### CTF (Juice Shop) prep — see `05_Setup_JuiceShop.md`
 - [ ] Kali Linux VM downloaded
@@ -324,13 +309,5 @@ sudo apt install -y crackmapexec impacket-scripts smbclient enum4linux \
 - [ ] SecLists wordlist collection cloned
 - [ ] PayloadsAllTheThings cloned
 - [ ] /usr/share/wordlists/rockyou.txt extracted (it's gzipped by default)
-
-### Day-2 (Security Hardening) prep — see `07_Setup_SecurityOnion.md`
-- [ ] Host has ≥ 64 GB RAM if you'll run Day 2 alongside MA2 (else 32 GB and shut down MA2 VMs first)
-- [ ] Security Onion 2.4 ISO downloaded (~9 GB) + SHA-256 verified
-- [ ] Wazuh agent RPM (Linux) on USB
-- [ ] Wazuh agent MSI (Windows) on USB
-- [ ] CentOS Stream 9 ISO already on hand (you have it from Day 1) — used for the OpenVPN service VM
-- [ ] NetworkMiner ZIP on USB (optional, for forensics phase)
 
 When all ticked, go to **`02_Setup_Topology.md`**.

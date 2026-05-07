@@ -1,4 +1,6 @@
-# 20 — Day 1 PM (MA2) — Firewall (pfSense + OpenVPN + Snort)
+# 20 — Day 2 (MA2) — Firewall (pfSense + OpenVPN + Snort)
+
+> File numbered with `Day1_MA2` historically; the actual competition gives MA2 a full Day 2.
 
 **Target time:** 75 min.
 **Owner:** Person A.
@@ -115,7 +117,7 @@ On WINSRV3:
 ### 5.3 Configure OpenVPN server
 **Where:** *VPN → OpenVPN → Servers → Add*
 - Server mode: `Remote Access (User Auth)` (so it auths against AD)
-- Backend for authentication: create a LDAP server first under *System → User Manager → Authentication Servers* → LDAP to WINSRV1 (`ldap://192.168.2.10`, baseDN `DC=manila,DC=com`, group filter `memberOf=CN=VPN Users,...`)
+- Backend for authentication: create a LDAP server first under *System → User Manager → Authentication Servers* → LDAP to WINSRV1 (`ldap://192.168.2.10`, baseDN `DC=manila,DC=com`, group filter `memberOf=CN=VPNGroup,...`) — **group name is exactly `VPNGroup`** (per MA2 PDF page 10), member `VPNUser` with password `P@ssw0rd`
 - Protocol: UDP/IPv4
 - Interface: WAN
 - Local port: 1194
@@ -140,7 +142,7 @@ On WINSRV3:
 ## Step 6 — Snort (IDS)
 
 ### 6.1 Install Snort package
-- *System → Package Manager → Available → snort → Install* (pre-downloaded per MA2 line 181).
+- *System → Package Manager → Available → snort → Install* (pre-downloaded per MA2 PDF page 10).
 
 ### 6.2 Global settings
 - *Services → Snort → Global Settings* → enable "Install Snort VRT rules" if available; otherwise just Emerging Threats free rules.
@@ -153,13 +155,18 @@ On WINSRV3:
 - Logging: log to system log
 - Save.
 
-### 6.4 Add the custom XMAS rule
+### 6.4 Add the custom FIN scan rule
+**Source: MA2 PDF page 10** — the rule is **FIN scan**, NOT XMAS scan (the older docx had XMAS — superseded).
+
 - *Snort → WAN tab → Rules → Category: custom.rules*
-- Add:
+- Add (paste exactly):
 ```
-drop tcp any any <> $HOME_NET/24 (flags: FPU; msg:"Possible XMAS scan"; sid:100001;)
+alert tcp any any <> $HOME_NET any (flags: F; msg: "Possible FIN scan"; sid: 100001;)
 ```
-> Note: the marking-scheme rule has a typo `a.b.c.d/24` — replace with `$HOME_NET` (your WAN subnet, e.g. `10.0.0.0/24`).
+
+> The MA2 PDF rule has placeholder `a.b.c.d/24` — replace with `$HOME_NET` (Snort variable that auto-resolves to the WAN subnet you set in the Snort interface settings, e.g. `10.0.0.0/24`).
+> Action is `alert` per the PDF (NOT `drop`).
+> Flags `F` = FIN flag only.
 
 ### 6.5 Start Snort on WAN
 - *Snort Interfaces → WAN → Start* (▶).

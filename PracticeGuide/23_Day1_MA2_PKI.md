@@ -1,4 +1,4 @@
-# 23 — Day 1 PM (MA2) — PKI (WINSRV3 Issuing CA)
+# 23 — Day 2 (MA2) — PKI (WINSRV3 Issuing CA)
 
 **Target time:** 20 min.
 **Owner:** Person A (after Firewall) or Person B (after AD).
@@ -49,7 +49,7 @@ Start-Service CertSvc
 
 ## Step 3 — Issue a Web Server cert for the IIS site on WINSRV3
 
-This is what MA2 line 194 calls *"Through autoenrollment, WINSRV3 should receive a certificate for the Web server in the IIS installation."* Strictly speaking IIS Web Server isn't an autoenroll template, so we request it manually.
+Per **MA2 PDF page 11**: *"Through auto-enrollment, WinSRV3 should receive a certificate for the Web server in the IIS installation. (Website: https://webtest.manila.com)"*. Strictly speaking IIS Web Server isn't an autoenroll template, so we request it manually.
 
 ```powershell
 # On WINSRV3

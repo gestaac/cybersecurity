@@ -70,16 +70,39 @@ This order ensures DHCP requests get answered cleanly.
 
 ### IP addressing plan
 
-The TP-Link router runs DHCP automatically (default subnet usually `192.168.1.0/24` with router at `.1`). We let the PCs use DHCP (zero config) and **pin a static IP on ESXi only**, so the URL is always the same.
+The TP-Link router runs DHCP automatically. We change the router's LAN to a non-conflicting subnet (`192.168.50.0/24`) and pin a static IP on ESXi to **`192.168.1.1`** to match the MA2 PDF.
 
-| Device | IP method | Final IP | Why |
-|---|---|---|---|
-| TP-Link router | (its own default) | `192.168.1.1` | Gateway, DHCP, internet uplink |
-| ESXi server mgmt vmk0 | **Static** (set in ESXi console) | `192.168.1.10` | So `https://192.168.1.10/ui` always works |
-| PC1 onboard NIC | DHCP automatic | e.g. `192.168.1.101` | Just plug in, it works |
-| PC2 onboard NIC | DHCP automatic | e.g. `192.168.1.102` | Same |
+> ⚠️ **Why a non-default subnet?** The MA2 PDF page 3 says competition ESXi is at `192.168.1.1`. Most TP-Link routers default to `192.168.1.1` for their LAN gateway — a direct collision. Either:
+> - **Option A (recommended):** change the TP-Link LAN subnet to `192.168.50.0/24` so the router is `192.168.50.1` and ESXi sits at `192.168.1.1` matching the PDF.
+> - **Option B:** keep router at `192.168.1.1` and put ESXi at any other free IP like `192.168.1.10` — works for practice, but the URL won't match the PDF.
 
-> Adjust the `.10`/`.101`/`.102` addresses to match your TP-Link router's actual subnet. Some TP-Link routers default to `192.168.0.0/24` — check the sticker on the router or open `192.168.0.1` / `192.168.1.1` in a browser from PC1 once it's plugged in.
+### Option A (matches PDF exactly)
+
+1. Log in to the TP-Link router web UI (its default address — usually `192.168.0.1` or `192.168.1.1` printed on the bottom sticker).
+2. Network → LAN → Change IP to `192.168.50.1` / `255.255.255.0` → Save → router reboots.
+3. Reconnect; PC1/PC2 will get DHCP from `192.168.50.0/24`.
+
+| Device | IP method | Final IP |
+|---|---|---|
+| TP-Link router LAN | (manual change) | `192.168.50.1` |
+| ESXi server mgmt vmk0 | **Static** (set in ESXi console) | `192.168.1.1` (matches PDF) |
+| PC1 onboard NIC | DHCP automatic | e.g. `192.168.50.101` |
+| PC2 onboard NIC | DHCP automatic | e.g. `192.168.50.102` |
+
+> Wait — if PCs are on `192.168.50.x` and ESXi is on `192.168.1.x`, they can't talk! You need a route or a second NIC. Easier:
+
+### Option B (simpler — practice doesn't need to match PDF subnet)
+
+Keep everything on the router's default subnet, just put ESXi at `.10`:
+
+| Device | IP method | Final IP |
+|---|---|---|
+| TP-Link router | (its own default) | `192.168.1.1` |
+| ESXi server mgmt vmk0 | **Static** (set in ESXi console) | `192.168.1.10` |
+| PC1 onboard NIC | DHCP automatic | e.g. `192.168.1.101` |
+| PC2 onboard NIC | DHCP automatic | e.g. `192.168.1.102` |
+
+> Practice URL: `https://192.168.1.10/ui` (instead of `https://192.168.1.1/ui` from PDF). Same workflow, different IP. **Use Option B for practice unless you want full PDF realism.** All sections below use `192.168.1.10`; if you go with Option A, mentally substitute `.1` for `.10`.
 
 ### Set ESXi static IP (1 minute, once)
 
@@ -146,7 +169,7 @@ Same.
 Same.
 
 #### Step 5 — Create vSwitch5 (MA1) + port group `PG-MA1-LAN`
-**Why:** MA1 uses 172.16.100.0/24 with grimshay.local — separate from MA2 to avoid IP collision.
+**Why:** MA1 (per the actual MA1 PDF) uses `192.168.2.0/24` for the CMS pentest target + Kali — keep on its own port group so you can power MA1 + MA2 separately.
 **Clicks:** Name: `vSwitch-MA1`, port group: `PG-MA1-LAN`, VLAN 0.
 
 ### Final port-group inventory
@@ -157,7 +180,7 @@ Same.
 | `PG-LAN` | pfSense LAN, Client1, Client2 |
 | `PG-DMZ` | pfSense DMZ, LinSRV1 |
 | `PG-Servers` | pfSense Servers, WinSRV1, WinSRV3, WinSRV4 |
-| `PG-MA1-LAN` | DC.grimshay.local, www.grimshay.ca, AMClient1, AMClient2 |
+| `PG-MA1-CMS` (was `PG-MA1-LAN` in older docx) | CMS pentest target + Kali (per MA1 PDF Table 1) |
 | Default `VM Network` | only used to give VMs initial internet access during install (then disconnect) |
 
 ---
@@ -210,16 +233,14 @@ Internet (PG-Internet)              LAN (PG-LAN)
 
 ---
 
-## D. The MA1 IP plan (separate)
+## D. The MA1 IP plan (per MA1 PDF Table 1)
 
 | VM | Port group | IP | Role |
 |---|---|---|---|
-| DC.grimshay.local | PG-MA1-LAN | 172.16.100.10/24 | AD + DNS for grimshay.local |
-| www.grimshay.ca | PG-MA1-LAN | 172.16.100.13/24 | Apache (intentionally weak) |
-| AMClient1 | PG-MA1-LAN | 172.16.100.1/24 | Win10 client |
-| AMClient2 | PG-MA1-LAN | 172.16.100.2/24 | Win10 client |
+| Linux Server with CMS | PG-MA1-CMS | 192.168.2.1/24 | Pentest target (intentionally vulnerable CMS) |
+| Kali Linux | PG-MA1-CMS | 192.168.2.2/24 | Attacker box (`kali / kali`) |
 
-> Same `172.16.100.0/24` is used by both MA1 and the MA2 LAN — this is fine because they live on **different vSwitches** that never bridge to each other. Just don't power both sets on at once if you ever route them.
+> Same `192.168.2.0/24` is used by both MA1 (PG-MA1-CMS) and the MA2 Servers VLAN (PG-Servers) — this is fine because they live on **different vSwitches** that never bridge. Just don't power MA1 + MA2 simultaneously.
 
 ---
 
@@ -231,10 +252,10 @@ The wiring + IP plan in Section A already matches Team 1's practice rig (TP-Link
 
 The TP-Link router brings internet so you can:
 - Download VMware Workstation Pro, ESXi ISO, OS ISOs.
-- Pull Wazuh agents, Security Onion ISO, VulnHub VMs, Juice Shop ZIP.
+- Pull VulnHub VMs, Juice Shop ZIP, Kali updates.
 - Update Kali, install packages with `dnf`/`apt` during VM build.
 
-**During the actual competition there is NO internet** — every package needed is pre-staged on the supplied VMs (per MA2 lines 178/181 *"Packages have been pre-downloaded"*). For Day 2 (Security Hardening), the competition organisers pre-download Security Onion + OpenVPN too. You only need internet during **practice** to download all the tools/VMs/ISOs to your USB stick.
+**During the actual competition there is NO internet** — every package needed is pre-staged on the supplied VMs (per MA2 PDF *"Packages have been pre-downloaded"*). You only need internet during **practice** to download all the tools/VMs/ISOs to your USB stick.
 
 > 💡 **Dry-run tip:** for your last 2 dry-runs, **unplug Cable 1** (router → switch) so PC1, PC2 and ESXi lose internet. This forces you to check that everything you need is already on local disk — exactly like competition day.
 
@@ -322,9 +343,9 @@ Mostly **VM viewers + documentation machines**. Minimal security tooling on the 
 | Browser | Chrome + Firefox (to reach ESXi web UI, pfSense web UI, Juice Shop) |
 | Remote access | PuTTY, WinSCP, OpenSSH client (built in) |
 | Documentation | LibreOffice / MS Office, Greenshot, Notepad++, Print-to-PDF |
-| Auth credentials | `Competitor0 / CharterDressing` per MA1 line 20 |
+| Auth credentials | **Day 1 (MA1):** `competitor1a / Boracay@14!` (per MA1 PDF page 3). **Day 2 (MA2):** `competitor1b / Tagaytay_62&L` (per MA2 PDF page 3). |
 
-> The login `Competitor0` is on the physical workstation. Inside the VMs, separate credentials apply (e.g. `MANILA\Anorbert / P@ssw0rd`).
+> The login `competitor1a` (MA1) / `competitor1b` (MA2) is on the physical workstation. Inside the VMs, separate credentials apply (e.g. AD users from MA2 PDF Table 3: `MANILA\M001 / P@ssw0rd`).
 
 ### G.2 Physical ESXi server (the 3rd box)
 
@@ -333,49 +354,47 @@ Just one thing on it: **VMware ESXi 8.x**. ESXi is the bare-metal hypervisor —
 | Layer | What |
 |---|---|
 | OS | VMware ESXi 8 (no Linux/Windows underneath) |
-| Auth | `pmuser / Paul Bocuse` afternoon (MA2 line 38) and `amuser / Mt Blanc` morning (MA1 line 60) |
+| Auth | **`wsauser / Andres@9V4`** at IP `192.168.1.1` (per MA2 PDF page 3, Day 2 only). MA1 PDF doesn't expose ESXi credentials — competitors only use the workstation on Day 1. |
 
 ### G.3 VMs hosted on the ESXi server (the actual practice surface)
 
 Pre-built and pre-configured by the organisers — already on the ESXi datastore when you arrive.
 
-#### G.3.1 Morning — MA1 set (assess Apache vulnerabilities)
-| VM | Role | Pre-installed inside |
-|---|---|---|
-| **DC.grimshay.local** | Domain controller, DNS for grimshay.local | AD, DNS |
-| **www.grimshay.ca** | The deliberately weak Apache web server (your assessment target) | Apache + LDAP auth misconfigured (the flaws you're hunting) |
-| **AMClient1** | Win10 LAN client | Chrome, PuTTY, Wireshark *(MA1 line 50)* |
-| **AMClient2** | Win10 LAN client | Same |
+#### G.3.1 Day 1 — MA1 set (CMS pentest target)
+**Per MA1 PDF page 4** — only **2 VMs**:
 
-#### G.3.2 Afternoon — MA2 set (build/harden manila.com)
+| VM | IP | Role | Pre-installed inside |
+|---|---|---|---|
+| **Linux Server with CMS** | 192.168.2.1 | Pentest target (intentionally vulnerable CMS — Drupal 7 likely) | CMS with a deliberately weak user account + privesc path to root |
+| **Kali Linux** | 192.168.2.2 | Attacker box (`kali / kali` per PDF) | Standard Kali tooling: nmap, sqlmap, hydra, john, hashcat, searchsploit, msfconsole |
+
+> Workstation login: `competitor1a / Boracay@14!`
+
+#### G.3.2 Day 2 — MA2 set (build/harden manila.com)
+**Per MA2 PDF Table 1** — 9 VMs across 4 VLANs:
+
 | VM | Role | Pre-installed inside |
 |---|---|---|
-| **ISP** | Fake Internet, DNS, DHCP, hosts test sites | dnsmasq + Apache with self-signed certs |
-| **pfSense** | Firewall, base install only — you configure it | pfSense 2.7.2 base + **OpenVPN package pre-downloaded** + **Snort package pre-downloaded** *(MA2 lines 178, 181)* |
-| **WINSRV1** | DC for manila.com, file server | Win Server 2022 + AD + DNS + DHCP, **`googleChromeEnterpriseBundle64.zip` pre-staged in Documents** *(MA2 line 204)*, plus `manila.jpg` placeholder |
-| **WINSRV3** | Issuing CA (half-built — you finish it) | Win Server 2022 + AD CS subordinate role partially configured |
+| **ISP** | Fake Internet, DNS, DHCP, hosts test sites (`www.nationalmuseum.gov.ph`, `www.starcity.com.ph`) | dnsmasq + Apache with self-signed certs |
+| **pfSense** | Firewall, base install only — you configure it | pfSense 2.7.2 base + **OpenVPN package pre-downloaded** + **Snort package pre-downloaded** |
+| **WINSRV1** | DC for manila.com, file server | Win Server 2022 + AD + DNS + DHCP, AD users per MA2 PDF Table 3 (M001/M002/M003/M004/S001/C1/C2) |
+| **WINSRV3** | Issuing CA (already installed per PDF) | Win Server 2022 + AD CS subordinate role |
 | **WINSRV4** | Offline Root CA (already configured) | Win Server 2022 + AD CS standalone root |
 | **LINSRV1** | Apache web server in DMZ, you harden it | CentOS Stream 9 + httpd + base packages, deliberately un-hardened |
-| **Client1** | LAN client, DHCP | Win 10 + Chrome, PuTTY, Wireshark |
-| **Client2** | LAN client, DHCP | Same |
-| **Client3** | External client, DHCP from ISP | Win 10 + Chrome, PuTTY, Wireshark, **Nmap** *(MA2 line 235)*, OpenVPN Connect |
+| **Client1, Client2** | LAN clients, DHCP | Win 10 + Chrome, PuTTY, Wireshark |
+| **Client3** | External client, DHCP from ISP | Win 10 + Chrome, PuTTY, Wireshark, **Nmap**, OpenVPN Connect |
 
-#### G.3.3 Day 2 — Security Hardening (per chief Marlon, speculative)
-Official Day 2 doc not released yet. Likely:
+> Workstation login: `competitor1b / Tagaytay_62&L`. ESXi login: `wsauser / Andres@9V4` at `192.168.1.1`.
 
-| VM | Role | Pre-installed inside |
-|---|---|---|
-| **Security Onion** | SOC platform | Either pre-installed Security Onion 2.4 OR a fresh CentOS/Ubuntu with the SO ISO pre-staged on the datastore for you to install |
-| **OpenVPN service** | Standalone OpenVPN server | Either pre-installed CentOS with OpenVPN pre-staged, OR fresh build using locally cached RPMs |
-| **Possibly: monitored hosts** | Receivers of Wazuh agents | Day 1's LinSRV1 + WINSRV1 may carry over from morning |
+#### G.3.3 Day 3 — CTF (random-pick + Juice Shop)
+**Per chief Marlon's confirmation** — Day 3 is CTF, VulnHub-style:
 
-#### G.3.4 Days 3–4 — CTF (random-pick from VulnHub + Juice Shop)
 | VM | Role |
 |---|---|
-| **Kali Linux** | Your attacker box — pre-loaded with Burp Community, sqlmap, nmap, gobuster, ffuf, jwt_tool, hashcat, john, Volatility 3, Ghidra, etc. |
-| **OWASP Juice Shop** | Web CTF target (confirmed by Marlon) — likely as a Node.js install on a server VM |
-| **1–N VulnHub VMs** | Boot-to-root targets, randomly picked by chief from VulnHub catalogue |
-| **CTFD server** | Scoreboard (separate from team ESXi — runs on competition LAN per Infrastructure-List, managed by organisers) |
+| **Kali Linux** | Your attacker box — pre-loaded with Burp Community, sqlmap, nmap, gobuster, ffuf, jwt_tool, hashcat, john, Volatility 3, Ghidra |
+| **OWASP Juice Shop** | Web CTF target (likely as a Node.js install on a server VM, or a separate VM) |
+| **1–N VulnHub VMs** | Boot-to-root targets, **randomly picked** by chief from VulnHub catalogue |
+| **CTFD server** | Scoreboard (separate from team ESXi — runs on competition LAN, managed by organisers) |
 
 ### G.4 What you BRING on USB
 
@@ -386,8 +405,7 @@ Per CTF rules: **no internet at the venue**. Bring everything pre-downloaded:
 | Reference docs | Pwning OWASP Juice Shop PDF, HackTricks PDF, GTFOBins offline mirror, OWASP Top 10 PDF |
 | Wordlists | rockyou.txt, SecLists, PayloadsAllTheThings |
 | Privesc tools | LinPEAS, WinPEAS, LinEnum.sh |
-| Web tools | Burp Suite Community installer (in case Kali doesn't have it), CyberChef offline build |
-| Day-2 specific | Wazuh agent RPM (Linux) + MSI (Windows), Security Onion 2.4 ISO (backup), NetworkMiner |
+| Web tools | Burp Suite Community installer, CyberChef offline build |
 | Networking tools | Nmap installer (Windows), Wireshark installer |
 | Documentation | LibreOffice installer, Greenshot installer |
 | Backup | Full copy of your `PracticeGuide/` folder so you have offline reference |
@@ -411,18 +429,15 @@ These are the actual deliverables that earn you marks:
 
 | Day | Action |
 |---|---|
-| MA1 | Write the executive summary + 2 vulnerability reports (no install — just analysis + writing) |
-| MA2 | Configure pfSense rules, OpenVPN, Snort; harden LinSRV1; create AD GPOs/share/audit; finish PKI on WINSRV3 |
-| Day 2 | Build/configure Security Onion, deploy Wazuh agents, configure OpenVPN service, investigate alerts |
-| Days 3–4 | Solve the challenges (Juice Shop + VulnHub VMs) |
+| Day 1 (MA1) | Pentest the CMS target: Information Gathering → CMS vuln assessment → user/root privesc → 150-word executive summary + top-3 risks |
+| Day 2 (MA2) | Configure pfSense rules, OpenVPN, Snort; harden LinSRV1; create 7 GPOs + share/audit; finish PKI on WINSRV3; functional verification from clients |
+| Day 3 (CTF) | Solve the random-pick VulnHub VM(s) + Juice Shop challenges |
 
-### G.7 Open unknowns (will be resolved when chief releases more docs)
+### G.7 Open unknowns (resolved when chief shares more)
 
 | Unknown | Impact |
 |---|---|
-| Whether Day 2 VMs ship pre-installed with SO, or fresh OS for you to install SO from local ISO | Both cases covered in `24_Day2_SecurityHardening.md` |
-| Which specific VulnHub VMs the chief picks | We practise on the top-8 most likely (per `06_…` Part F) |
+| Which specific VulnHub VM the chief picks for Day 3 | We practise on the top 8 most likely (per `06_…` Part F) |
+| Whether Juice Shop is alongside the VulnHub VM or just a warm-up | Methodology is documented either way (`50_…`/`51_…`/`52_…`) |
 | Whether CTFD is on a single shared server or per-team | Doesn't affect prep — you submit flags to whatever URL is given |
-| Whether OpenVPN Day 2 is a separate VM or just a service on an existing one | `24_…` covers building from scratch, which works either way |
-
-If the chief releases the Day 2 official doc, several of these unknowns disappear.
+| Whether the marking-scheme rows for Days 2/3 (Lyon-leftover names) get rebalanced | K-totals still sum to 25/criterion regardless — prep doesn't change |

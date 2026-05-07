@@ -1,378 +1,251 @@
-# 03 — Build the MA1 Practice Environment (grimshay.local)
+# 03 — Build the MA1 Practice Environment (CMS pentest target)
 
-In MA1 you're handed a pre-built grimshay.local environment with an Apache/website you must **assess** for security flaws. For practice you build the same environment yourself **with the deliberate flaws baked in**, so on competition day you'll already recognise them.
+The actual MA1 (per the official PDF in `testpacakge_pdf/`) is a **pentest** of a Linux server running a CMS. You have 2 VMs:
 
-> **Total build time:** ~3 hours first time, then 30 min from snapshots.
+| VM | IP | Role |
+|---|---|---|
+| **Linux Server with CMS** | 192.168.2.1 | Target machine (intentionally vulnerable CMS) |
+| **Kali Linux** | 192.168.2.2 | Attacker box (Kali + standard pentest tools) |
 
----
+For practice we build the same 2 VMs ourselves. The chief hasn't disclosed which CMS the competition will use — we go with **Drupal 7** because:
+- It's the most-used CMS in WSC pentest scenarios.
+- Maps cleanly to the 4 MA1 tasks (Info Gathering / CMS Vuln Assess / System Weaknesses / Report).
+- Ships with the famous **Drupalgeddon 2 (CVE-2018-7600)** — exploitable for RCE.
+- Same family as VulnHub's **DC-1** which has documented walkthroughs.
 
-## VMs to create on `vSwitch-MA1` / `PG-MA1-LAN`
+> Time to build: ~90 min first time, 5 min from snapshot afterward.
 
-| VM | OS | RAM | Disk | IP |
-|---|---|---|---|---|
-| DC.grimshay.local | Win Server 2022 Eval | 4 GB | 60 GB | 172.16.100.10 |
-| www.grimshay.ca | CentOS Stream 9 | 2 GB | 20 GB | 172.16.100.13 |
-| AMClient1 | Win 10 Enterprise Eval | 2 GB | 40 GB | 172.16.100.1 |
-| AMClient2 | Win 10 Enterprise Eval | 2 GB | 40 GB | 172.16.100.2 |
-
-> All accounts use password `P@ssw0rd` per MA1 line 45.
-
----
-
-## Part 1 — Domain Controller (DC.grimshay.local)
-
-### Step 1.1 — Install Windows Server 2022
-**Tools:** ESXi *Create VM* wizard, Windows Server 2022 ISO.
-**Clicks:** New VM → Guest OS Windows 2022 → 4 GB RAM → 2 vCPU → 60 GB disk → Network adapter on `PG-MA1-LAN` → mount ISO → Power on → standard install (*Standard Eval (Desktop Experience)*) → set Administrator password to `P@ssw0rd` → log in.
-**Expected:** Server Manager opens.
-**If it fails:** make sure VM has at least 4 GB RAM; install will hang otherwise.
-
-### Step 1.2 — Set static IP
-**Where:** DC → *Settings → Network & Internet → Ethernet → Edit IP*
-**Settings:**
-- IPv4 manual: 172.16.100.10 / 24 / no gateway
-- DNS: 127.0.0.1
-**Verify:** `ipconfig` shows the address.
-
-### Step 1.3 — Rename + promote to DC (GUI)
-
-#### 1.3.1 — Rename the computer to `DC`
-**Tools:** Server Manager (opens automatically when you log in to Desktop Experience).
-
-1. *Server Manager → Local Server* (left sidebar).
-2. In the **PROPERTIES** section, find the row labeled *Computer name* — it'll show a random name like `WIN-XXXXXX`. Click that name.
-3. *System Properties* dialog opens → **Change…** button.
-4. *Computer name:* type `DC` → OK.
-5. Prompt: *"You must restart your computer..."* → **OK**.
-6. Back in System Properties → **Close** → click **Restart Now**.
-
-**Verify after reboot:** log back in. Server Manager → Local Server → Computer name now shows `DC`.
-
-> *Quick PowerShell alternative:* `Rename-Computer -NewName "DC" -Restart`
-
-#### 1.3.2 — Set static IP (skip if already done in Step 1.2)
-Already covered in Step 1.2 above. Confirm `ipconfig` shows `172.16.100.10` before continuing.
-
-#### 1.3.3 — Install AD Domain Services role
-**Tools:** Server Manager.
-
-1. *Server Manager → Manage* (top-right) → **Add Roles and Features**.
-2. *Before You Begin* → Next.
-3. *Installation Type* → **Role-based or feature-based installation** → Next.
-4. *Server Selection* → leave default (`DC` selected) → Next.
-5. *Server Roles* → tick ☑ **Active Directory Domain Services**.
-   - Pop-up: *"Add features that are required..."* → **Add Features** → close the pop-up → Next.
-6. *Features* → leave defaults → Next.
-7. *AD DS* (info screen) → Next.
-8. *Confirmation* → tick ☑ **Restart the destination server automatically if required** → **Install**.
-9. Wait ~3 minutes. The progress bar may say "Installation succeeded" before fully done — wait for the close button.
-
-**Verify:** Server Manager dashboard now shows **AD DS** in the left sidebar.
-
-> *Quick PowerShell alternative:* `Install-WindowsFeature AD-Domain-Services -IncludeManagementTools`
-
-#### 1.3.4 — Promote to Domain Controller
-After the role install, Server Manager shows a yellow flag at the top-right with a yellow triangle and the text *"Configuration required for Active Directory Domain Services at DC"*.
-
-1. Click that yellow flag → click **Promote this server to a domain controller**.
-2. *Deployment Configuration*:
-   - Select **Add a new forest**.
-   - Root domain name: `grimshay.local` → Next.
-3. *Domain Controller Options*:
-   - Forest functional level: Windows Server 2016 (default).
-   - Domain functional level: Windows Server 2016 (default).
-   - Tick ☑ **Domain Name System (DNS) server**.
-   - Tick ☑ **Global Catalog (GC)**.
-   - **Type the Directory Services Restore Mode (DSRM) password:** `P@ssw0rd` → confirm.
-   - Next.
-4. *DNS Options* — yellow warning *"A delegation for this DNS server cannot be created..."* — **ignore**, click Next.
-5. *Additional Options*:
-   - NetBIOS domain name: `GRIMSHAY` (default — confirm).
-   - Next.
-6. *Paths* → leave defaults (NTDS, SYSVOL, log paths) → Next.
-7. *Review Options* → review → Next.
-8. *Prerequisites Check* — should show *"All prerequisite checks passed successfully"*. Yellow warnings about cryptography are normal — ignore.
-9. **Install** → wait ~5 min → the VM will **reboot automatically** when done.
-
-**Verify after reboot:** at the login screen, you'll now see `GRIMSHAY\Administrator` instead of just `Administrator`. Log in.
-
-> *Quick PowerShell alternative:* the multi-line `Install-ADDSForest` command from earlier. GUI takes ~5 min, PowerShell ~3 min.
+> **At competition** the chief pre-installs the target VM and Kali. You don't build them — you just run the pentest in `10_Day1_MA1_Solution.md`. This file is for **practice prep** so you've seen the same shape of target before competition day.
 
 ---
 
-### Step 1.4 — Create the `webusers` group + 3 test users (GUI)
-**Why:** MA1 says only `webusers` should access the website.
-**Tools:** Active Directory Users and Computers (ADUC).
+## Part 1 — Network setup
 
-#### 1.4.1 — Open ADUC
-*Server Manager → Tools → Active Directory Users and Computers* (sorted alphabetically near the top).
+Both VMs sit on a **single host-only VMnet** with subnet `192.168.2.0/24`. They don't need internet (after the build is done).
 
-You'll see the tree on the left:
-```
-grimshay.local
-├── Builtin
-├── Computers
-├── Domain Controllers
-├── ForeignSecurityPrincipals
-├── Managed Service Accounts
-└── Users
-```
+### Single-PC mode (VMware Workstation)
+- Use **VMnet15** as a fresh host-only network with subnet `192.168.2.0/24`. Edit → Virtual Network Editor → Add → host-only → Subnet `192.168.2.0/24` → DHCP **disabled**, Connect host adapter ticked (so the Network Adapter dropdown shows it).
 
-#### 1.4.2 — Create the `webusers` security group
-1. Right-click the **Users** container → **New → Group**.
-2. *Group name:* `webusers`.
-3. *Group scope:* **Global** (default).
-4. *Group type:* **Security** (default).
-5. OK.
-
-**Verify:** the right pane now lists `webusers` as type *Security Group - Global*.
-
-#### 1.4.3 — Create users alice, bob, carol
-For **each** of `alice`, `bob`, `carol`:
-1. Right-click **Users** → **New → User**.
-2. *First name:* alice (or bob, carol).
-3. *User logon name:* alice (lowercase, matches first name).
-4. Next.
-5. *Password:* `P@ssw0rd` → confirm.
-6. **UNTICK** *"User must change password at next logon"*.
-7. **TICK** *"Password never expires"*.
-8. Next → Finish.
-
-Repeat for bob, then carol.
-
-**Verify:** *Users* container now lists alice, bob, carol as *User* objects.
-
-#### 1.4.4 — Add alice, bob, carol to the `webusers` group
-**Method 1** — from the user side:
-1. Right-click **alice** → **Properties → Member Of** tab → **Add**.
-2. Type `webusers` → **Check Names** (auto-completes) → **OK** → OK.
-3. Repeat for bob and carol.
-
-**Method 2** — from the group side (faster for many users):
-1. Right-click **webusers** group → **Properties → Members** tab → **Add**.
-2. Type `alice; bob; carol` (semicolon-separated) → **Check Names** → OK → OK.
-
-**Verify:** double-click `webusers` → *Members* tab shows all three users.
-
-> *Quick PowerShell alternative:*
-> ```powershell
-> New-ADGroup -Name "webusers" -GroupScope Global -GroupCategory Security
-> "alice","bob","carol" | % {
->   New-ADUser -Name $_ -AccountPassword (ConvertTo-SecureString "P@ssw0rd" -AsPlainText -Force) -Enabled $true
->   Add-ADGroupMember -Identity webusers -Members $_
-> }
-> ```
+### 3-PC ESXi mode
+- Add a port group `PG-MA1-CMS` on a vSwitch. Subnet `192.168.2.0/24`.
 
 ---
 
-### Step 1.5 — Add DNS records for the webserver (GUI)
-**Why:** AMClient1 needs to resolve `www.grimshay.ca` and `www.grimshay.local` to LinSRV1's IP `172.16.100.13`.
-**Tools:** DNS Manager.
+## Part 2 — Build the CMS target VM (Drupal 7)
 
-#### 1.5.1 — Open DNS Manager
-*Server Manager → Tools → DNS*.
+### Step 2.1 — Create the VM
+- New VM → Linux → **CentOS Stream 9** or **Ubuntu Server 22.04** (either works; Ubuntu is simpler).
+- 2 GB RAM, 1 vCPU, 20 GB disk thin-provisioned.
+- NIC on VMnet15 (single-PC) or PG-MA1-CMS (ESXi).
+- During install: hostname `cms-target`, create user `competitor / P@ssw0rd`, set root password `P@ssw0rd`.
 
-Tree on the left:
-```
-DNS
-└── DC
-    ├── Forward Lookup Zones
-    │   ├── _msdcs.grimshay.local
-    │   └── grimshay.local            ← already exists
-    ├── Reverse Lookup Zones
-    └── ...
-```
+### Step 2.2 — Set static IP `192.168.2.1`
+After OS install, log in as root:
 
-#### 1.5.2 — Add A record for `www` in `grimshay.local`
-1. Expand *Forward Lookup Zones*.
-2. Right-click **grimshay.local** → **New Host (A or AAAA)…**.
-3. *Name (uses parent domain name if blank):* `www`.
-4. *IP address:* `172.16.100.13`.
-5. UNTICK *"Create associated pointer (PTR) record"* (no reverse zone yet).
-6. **Add Host** → success message → **OK** → **Done**.
-
-**Verify:** double-click `grimshay.local` → see `www` row with type *Host (A)* and data `172.16.100.13`.
-
-#### 1.5.3 — Create the `grimshay.ca` primary zone
-The website hostname is actually `www.grimshay.ca` (per MA1), so we need a separate zone for the `.ca` TLD too.
-
-1. Right-click **Forward Lookup Zones** → **New Zone…**.
-2. Wizard:
-   - *Zone Type* → **Primary zone** (leave *"Store the zone in Active Directory"* ticked).
-   - *Replication Scope* → **To all DNS servers running on domain controllers in this forest** → Next.
-   - *Zone Name* → `grimshay.ca` → Next.
-   - *Dynamic Update* → **Allow only secure dynamic updates (recommended for AD)** → Next.
-   - **Finish**.
-
-**Verify:** *Forward Lookup Zones* now shows both `grimshay.local` and `grimshay.ca`.
-
-#### 1.5.4 — Add A record for `www` in `grimshay.ca`
-1. Right-click **grimshay.ca** → **New Host (A or AAAA)…**.
-2. *Name:* `www`.
-3. *IP address:* `172.16.100.13`.
-4. **Add Host** → OK → Done.
-
-**Verify:** from a command prompt on DC:
-```cmd
-nslookup www.grimshay.ca
-nslookup www.grimshay.local
-```
-Both should return `172.16.100.13`.
-
-> *Quick PowerShell alternative:*
-> ```powershell
-> Add-DnsServerResourceRecordA -Name "www" -ZoneName "grimshay.local" -IPv4Address "172.16.100.13"
-> Add-DnsServerPrimaryZone -Name "grimshay.ca" -ReplicationScope "Forest"
-> Add-DnsServerResourceRecordA -Name "www" -ZoneName "grimshay.ca" -IPv4Address "172.16.100.13"
-> ```
-
-### Step 1.6 — Snapshot
-ESXi → DC → *Take snapshot* → name `01-DC-clean`.
-
----
-
-## Part 2 — Linux webserver (www.grimshay.ca, **deliberately weak**)
-
-This is the box you will assess in MA1. Build it with the **5 deliberate vulnerabilities** the marking-scheme judge notes call out (rows 32 G-column).
-
-### Step 2.1 — Install CentOS Stream 9
-**Clicks:** New VM → Linux → CentOS 9 → 2 GB RAM → 1 vCPU → 20 GB disk → NIC on `PG-MA1-LAN` → mount ISO → standard install (*Server*), password `P@ssw0rd` for root, create user `competitor / P@ssw0rd`.
-**After install:**
+**Ubuntu:**
 ```bash
-nmcli con mod ens160 ipv4.addresses 172.16.100.13/24 ipv4.method manual ipv4.dns 172.16.100.10
-nmcli con up ens160
-hostnamectl set-hostname www.grimshay.ca
+sudo nano /etc/netplan/00-installer-config.yaml
 ```
-
-### Step 2.2 — Install Apache + LDAP modules
+Replace contents:
+```yaml
+network:
+  version: 2
+  ethernets:
+    ens33:
+      addresses: [192.168.2.1/24]
+      nameservers:
+        addresses: [8.8.8.8]
+      routes:
+        - to: default
+          via: 192.168.2.254
+```
 ```bash
-sudo dnf install -y httpd mod_ldap mod_ssl openldap-clients
-sudo systemctl enable --now httpd
+sudo netplan apply
 ```
 
-### Step 2.3 — Drop a tiny site so there's something to assess
+**CentOS:**
 ```bash
-sudo mkdir -p /var/www/grimshay
-echo "<h1>grimshay.ca - members area</h1>" | sudo tee /var/www/grimshay/index.html
+sudo nmcli con mod ens160 ipv4.addresses 192.168.2.1/24 ipv4.method manual ipv4.dns 8.8.8.8
+sudo nmcli con up ens160
 ```
 
-### Step 2.4 — Configure the **vulnerable** Apache vhost
-**Why deliberately weak:** these are the flaws competitors must identify.
+> If you have NO gateway in this practice net, omit the route line. Connectivity to internet is needed only during the install of Drupal — afterwards the VM works isolated.
 
-Create `/etc/httpd/conf.d/grimshay.conf`:
-```apache
-<VirtualHost *:80>
-    ServerName www.grimshay.ca
-    DocumentRoot /var/www/grimshay
-    Redirect permanent / https://www.grimshay.ca/
-</VirtualHost>
+### Step 2.3 — Install LAMP stack + Drupal 7
 
-<VirtualHost *:443>
-    ServerName www.grimshay.ca
-    DocumentRoot /var/www/grimshay
-    SSLEngine on
-    SSLCertificateFile    /etc/pki/tls/certs/grimshay.crt
-    SSLCertificateKeyFile /etc/pki/tls/private/grimshay.key
-    # ⚠️ DELIBERATE FLAW 1: SSLProtocol not pinned (defaults allow TLS 1.0/1.1)
-    # ⚠️ DELIBERATE FLAW 2: SSLCipherSuite not restricted
-
-    <Location />
-        AuthType Basic
-        AuthName "Members Area"
-        AuthBasicProvider ldap
-        # ⚠️ DELIBERATE FLAW 3: ldap:// not ldaps:// — credentials sent in clear
-        AuthLDAPURL "ldap://172.16.100.10/DC=grimshay,DC=local?sAMAccountName?sub?(objectClass=user)"
-        AuthLDAPBindDN "CN=Administrator,CN=Users,DC=grimshay,DC=local"
-        AuthLDAPBindPassword "P@ssw0rd"
-        Require ldap-group CN=webusers,CN=Users,DC=grimshay,DC=local
-    </Location>
-</VirtualHost>
-```
-
-Generate the self-signed cert:
 ```bash
-sudo openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
-    -keyout /etc/pki/tls/private/grimshay.key \
-    -out    /etc/pki/tls/certs/grimshay.crt \
-    -subj "/CN=www.grimshay.ca"
-sudo chmod 644 /etc/pki/tls/certs/grimshay.crt
-sudo chmod 644 /etc/pki/tls/private/grimshay.key   # ⚠️ DELIBERATE FLAW 4: world-readable private key
+# Ubuntu
+sudo apt update
+sudo apt install -y apache2 mariadb-server php php-gd php-mysql php-curl php-mbstring php-xml php-cli wget unzip
+
+# Start + enable
+sudo systemctl enable --now apache2 mariadb
+
+# Secure MariaDB minimal
+sudo mysql -e "CREATE DATABASE drupal; CREATE USER 'drupal'@'localhost' IDENTIFIED BY 'drupalpass'; GRANT ALL ON drupal.* TO 'drupal'@'localhost'; FLUSH PRIVILEGES;"
+
+# Get Drupal 7 (the version with Drupalgeddon 2)
+cd /var/www
+sudo wget https://ftp.drupal.org/files/projects/drupal-7.57.tar.gz
+sudo tar xzf drupal-7.57.tar.gz
+sudo mv drupal-7.57 html-drupal
+sudo cp -r html-drupal/. /var/www/html/
+sudo rm /var/www/html/index.html  # remove default Apache page
+sudo cp /var/www/html/sites/default/default.settings.php /var/www/html/sites/default/settings.php
+sudo chown -R www-data:www-data /var/www/html
+sudo chmod 666 /var/www/html/sites/default/settings.php
+sudo mkdir -p /var/www/html/sites/default/files
+sudo chown -R www-data:www-data /var/www/html/sites/default/files
+sudo chmod -R 777 /var/www/html/sites/default/files
+sudo systemctl restart apache2
 ```
 
-### Step 2.5 — More deliberate flaws
+### Step 2.4 — Run the Drupal web installer
+From any browser (or `curl` from the same VM):
+- Visit `http://192.168.2.1/install.php`
+- *Standard* profile → Save.
+- Database type: MySQL/MariaDB.
+- DB name: `drupal`, user: `drupal`, password: `drupalpass`. → Save.
+- Site information:
+  - Site name: `Manila CMS`
+  - Site email: `admin@manila.local`
+  - **Site maintenance account → username `admin`, password `admin`** (deliberately weak — the "vulnerable user account" task)
+  - Default country: Philippines.
+  - Save.
+
+After install completes:
 ```bash
-# ⚠️ DELIBERATE FLAW 5: SELinux off
-sudo setenforce 0
-sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
-
-# ⚠️ DELIBERATE FLAW 6: default apache user/group used (no service-specific account)
-grep -E "^User|^Group" /etc/httpd/conf/httpd.conf
-# (should print "User apache" / "Group apache" — leave as is)
-
-# ⚠️ DELIBERATE FLAW 7: open file permissions on web root
-sudo chmod -R 777 /var/www/grimshay
+# Tighten settings.php so Drupal stops complaining
+sudo chmod 444 /var/www/html/sites/default/settings.php
 ```
 
-Start Apache:
+### Step 2.5 — Create a deliberately weak user (the "system weakness" target)
+The MA1 PDF Task 3 says *"a user account on the CMS service that exposes the system weakness... violate security policies"*. We'll create a user with a known-easy password:
+
+In the Drupal admin UI (`/?q=admin/people/create`):
+- Username: `john`
+- Email: `john@manila.local`
+- **Password: `password123`** (weak, in `rockyou.txt`)
+- Status: Active.
+- Roles: authenticated user.
+- Save.
+
+Also create the OS-level user `john` with a matching weak password (the MA1 Task 3 says "locate sensitive information stored within the vulnerable user account's home directory"):
+
 ```bash
-sudo systemctl restart httpd
-sudo firewall-cmd --add-service=http  --permanent
-sudo firewall-cmd --add-service=https --permanent
-sudo firewall-cmd --reload
+sudo useradd -m -s /bin/bash john
+echo "john:password123" | sudo chpasswd
+echo "Hidden flag in john's home: flag{john_was_here_2025}" | sudo tee /home/john/secret.txt
+sudo chown john:john /home/john/secret.txt
+sudo chmod 600 /home/john/secret.txt
 ```
 
-### Step 2.6 — Sanity test from a browser on the DC
-Open Edge/Chrome → `https://www.grimshay.ca` → accept cert warning → log in as `alice / P@ssw0rd` → expect the "members area" page.
+### Step 2.6 — Set up a privesc path (for Task 4 root access)
+Plant a SUID misconfiguration that mirrors what's commonly seen in WSC-style targets:
 
-### Step 2.7 — Snapshot
-ESXi → www.grimshay.ca → snapshot `02-web-vulnerable`.
+```bash
+# Make 'find' SUID — classic GTFOBins escape
+sudo chmod u+s /usr/bin/find
 
-> **Why we baked these flaws in:** These are exactly the vulnerabilities listed in the marking-scheme judge's notes for A1 row 32 (executive summary). On competition day, when you assess the supplied VM, you will be looking for these same patterns — practice spotting them.
+# Or alternatively (pick ONE for practice realism — both are valid pentest paths):
+# Sudo NOPASSWD vim:
+echo "john ALL=(ALL) NOPASSWD: /usr/bin/vim" | sudo tee /etc/sudoers.d/john
+sudo chmod 440 /etc/sudoers.d/john
+```
+
+Add a flag in `/root/`:
+```bash
+echo "Root flag: flag{root_compromise_complete_2025}" | sudo tee /root/proof.txt
+```
+
+### Step 2.7 — Sanity test
+From the same VM browser: `http://192.168.2.1` → see Drupal home page. Login as `admin/admin` → confirm admin panel loads.
+
+### Step 2.8 — Snapshot
+Snapshot the VM as `cms-target-vulnerable`. This is the **starting state** for every MA1 dry-run.
 
 ---
 
-## Part 3 — AMClient1 + AMClient2
+## Part 3 — Build the Kali attacker VM
 
-Repeat for both:
+### Step 3.1 — Import Kali
+- Download Kali 2025.x VMware image from `https://www.kali.org/get-kali/#kali-virtual-machines`.
+- Extract → File → Open the `.vmx` → "I copied it".
+- VM Settings → Network Adapter → **Custom: VMnet15** (single-PC) or **PG-MA1-CMS** (ESXi).
 
-### Step 3.1 — Install Windows 10 Enterprise Eval
-4 GB RAM ideal (2 GB minimum). NIC on `PG-MA1-LAN`. Local user `Competitor0 / CharterDressing` (per MA1 line 20).
-
-### Step 3.2 — Static IPs
-- AMClient1 → 172.16.100.1 / 24 / DNS 172.16.100.10
-- AMClient2 → 172.16.100.2 / 24 / DNS 172.16.100.10
-
-### Step 3.3 — Domain join
-```powershell
-Add-Computer -DomainName grimshay.local -Credential (Get-Credential) -Restart
+### Step 3.2 — Set static IP `192.168.2.2`
+After Kali boots:
+```bash
+sudo nmcli con mod "Wired connection 1" ipv4.addresses 192.168.2.2/24 ipv4.method manual
+sudo nmcli con up "Wired connection 1"
 ```
-Use Administrator / `P@ssw0rd` when prompted.
 
-### Step 3.4 — Install client tools
-- Chrome, PuTTY, Wireshark (per MA1 line 50).
+Default credentials: `kali / kali` (matches the MA1 PDF Table 1).
 
-### Step 3.5 — Snapshot
-Each client → snapshot `03-amclient-clean`.
+### Step 3.3 — Confirm tooling is present
+```bash
+which nmap sqlmap hydra john hashcat searchsploit drupalgeddon2 wpscan
+# All should print a path. Drupalgeddon may need install:
+sudo apt update
+sudo apt install -y exploitdb metasploit-framework hashcat hydra john sqlmap nikto whatweb
+sudo searchsploit -u   # update local exploit-db
+```
+
+### Step 3.4 — Verify Kali can reach the target
+```bash
+ping -c 3 192.168.2.1
+nmap -sV 192.168.2.1
+```
+Expected: ping replies, nmap sees ports 22 (ssh) + 80 (http).
+
+### Step 3.5 — Stage offline references on Kali
+Per CTF rules — no internet at competition. Pre-stage on Kali:
+```bash
+mkdir -p ~/refs
+cd ~/refs
+# Copy from your USB:
+#   - rockyou.txt (extracted from /usr/share/wordlists/rockyou.txt.gz)
+#   - linpeas.sh
+#   - GTFOBins offline mirror
+
+# Make rockyou available
+sudo gunzip -k /usr/share/wordlists/rockyou.txt.gz
+ls -la /usr/share/wordlists/rockyou.txt
+```
+
+### Step 3.6 — Snapshot
+Snapshot Kali as `kali-clean`.
 
 ---
 
-## Part 4 — Final integration check
+## Part 4 — Final verification before MA1 practice
 
-From AMClient1, log in as `alice@grimshay.local / P@ssw0rd`:
+From Kali:
+- [ ] `ping 192.168.2.1` replies
+- [ ] `nmap -sC -sV 192.168.2.1` shows ports 22 + 80, with HTTP banner identifying Drupal 7
+- [ ] Browser → `http://192.168.2.1` → Drupal home page loads
+- [ ] `john` user exists at OS level (`getent passwd john` shows it from a quick SSH attempt)
+- [ ] `/root/proof.txt` exists on target (verify after privesc later)
 
-1. Open Chrome → `https://www.grimshay.ca` → accept cert → log in alice/P@ssw0rd → expect "members area".
-2. Open PuTTY → `ssh competitor@172.16.100.13` → password `P@ssw0rd`.
-3. Open Wireshark → start capture → re-load the website → look at the LDAP frames going from 172.16.100.13 → 172.16.100.10 on TCP/389 — you should see `bindRequest` and credentials in cleartext. **This is one of the vulnerabilities you will report tomorrow morning.**
-
-If all three work — environment is ready.
+When all green → snapshot both VMs and proceed to **`10_Day1_MA1_Solution.md`**.
 
 ---
 
-## Snapshots checklist
+## Snapshot inventory
 
-- [ ] DC: `01-DC-clean`
-- [ ] www.grimshay.ca: `02-web-vulnerable`
-- [ ] AMClient1: `03-amclient-clean`
-- [ ] AMClient2: `03-amclient-clean`
+| VM | Snapshot name | When |
+|---|---|---|
+| CMS target | `cms-target-vulnerable` | After Steps 2.6 + verification |
+| Kali | `kali-clean` | After Step 3.6 |
 
-Next file: **`04_Setup_VMs_MA2.md`**.
+Restore both before each dry-run so the lab state is identical.
+
+---
+
+## Notes for competition day
+
+The actual competition target may be a different CMS (Joomla, WordPress, MediaWiki). The **methodology** in `10_…` is what transfers — the techniques (nmap recon, CMS version detection, exploit search, password brute, privesc) work on any CMS.
+
+Build this practice rig once. Run the pentest playbook 3+ times until it's muscle memory. Then on competition day, regardless of which CMS shows up, you're applying a familiar workflow.
+
+Next file: **`10_Day1_MA1_Solution.md`** — the 4-task walkthrough.

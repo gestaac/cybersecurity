@@ -1,4 +1,4 @@
-# 30 — Day 1 PM (MA2) — Functional Verification from Clients
+# 30 — Day 2 (MA2) — Functional Verification from Clients
 
 **Target time:** 45 min.
 **Run together** at the end of MA2. Both teammates execute the checks from the appropriate client. **If any step fails, the marking row fails — fix and re-test.**
@@ -24,7 +24,7 @@
 
 ## A6 — Tests from Client1 (LAN)
 
-Log on as `MANILA\Anorbert` / `P@ssw0rd` unless told otherwise.
+Log on as `MANILA\M001` / `P@ssw0rd` (Marketing user from MA2 PDF Table 3) unless told otherwise.
 
 ### A6.1 Reach allowed Internet site
 **Tools:** Chrome.
@@ -79,22 +79,22 @@ certutil -store -user My
 - Recent entries should show traffic from 172.16.100.x to 10.0.0.10/.20.
 **Marks:** [Crit A6 D105 K=0.5]
 
-### A6.10 SNORT XMAS rule present
-- *Snort → WAN tab → Rules → custom.rules* → SID 100001 enabled.
+### A6.10 SNORT FIN scan rule present
+- *Snort → WAN tab → Rules → custom.rules* → SID 100001 enabled (the FIN-scan rule per MA2 PDF page 10, NOT XMAS).
 **Marks:** [Crit A6 D106 K=0.3]
 
 ### A6.11 Banner before logon
-- Log out → log back in → banner title `WorldSkills ASEAN Manila`, body `authorized access only` appears before credential entry.
+- Log out → log back in → banner title `WorldSkills ASEAN Manila`, body `Authorized access only` (capital A) appears before credential entry.
 **Marks:** [Crit A6 D119 K=0.3] (this is technically an A7 row in the scheme but tested at any client)
 
 ---
 
 ## A7 — Tests from Client2 (LAN)
 
-Log on as `MANILA\mratt` / `P@ssw0rd`.
+Log on as `MANILA\C2` / `P@ssw0rd` (IT user, Singapore — has SSH access on LinSRV1).
 
 ### A7.1 SSH from putty as a domain user
-- PuTTY → `mratt@manila.com@192.168.1.10:2022`.
+- PuTTY → `C2@manila.com@192.168.1.10:2022`.
 **Expected:** login succeeds.
 **Marks:** [Crit A7 D113 K=0.3]
 
@@ -117,22 +117,36 @@ gpresult /v | findstr "certen"
 **Expected:** `certenroll` GPO applied.
 **Marks:** [Crit A7 D116 K=0.3]
 
-### A7.5 Chrome homepage forced to w3.manila.com
-- Open Chrome → cold-start opens `http://w3.manila.com` (or attempts to). Try changing homepage in settings → relaunch → setting reverts.
-**Marks:** [Crit A7 D117 K=0.2] + [D118 K=0.2]
+### A7.5 Lockout policy works
+- Login attempt as M001 with **wrong password 3 times** in a row → account locked.
+- Wait 60 seconds → can log in again with correct password.
+**Marks:** verifies the `lockout` GPO from `22_…` Step 4.
 
 ### A7.6 Banner before logon
 - Same banner test as A6.11 if not already covered.
 **Marks:** [Crit A7 D119 K=0.3]
 
-### A7.7 Share access as `gfxguy` (Modify)
-- Sign out → Sign in as `MANILA\gfxguy` / `P@ssw0rd`.
-- Win+R → `\\winsrv1\pictures\manila.jpg` → file opens.
-- Right-click file → Save As → save back to share → succeeds (Modify rights).
+### A7.7 Share access as M001 (Marketing → Read) and M004 (Executive → Full Control)
+
+**Per MA2 PDF page 12** — share permissions changed: **Marketing = R**, **Executive = FC**.
+
+**As M001 (Marketing, Read):**
+- Sign out → Sign in to Client2 as `MANILA\M001` / `P@ssw0rd`.
+- Win+R → `\\winsrv1\pictures\park.jpg` → file opens for read.
+- Try to delete or modify → **denied** (Read-only).
+
+**As M004 (Executive, Full Control):**
+- Sign out → Sign in as `MANILA\M004` / `P@ssw0rd`.
+- Win+R → `\\winsrv1\pictures\park.jpg` → opens.
+- Create a new file in the share / delete an existing one → **succeeds**.
+
+**As M002 (Customer Service, no access):**
+- Sign in as M002 → try to access `\\winsrv1\pictures\` → **access denied**.
+
 **Marks:** [Crit A7 D120 K=0.3]
 
 ### A7.8 Audit log on WINSRV1
-- On WINSRV1 → *Event Viewer → Security* → filter Event ID 4663 → see `gfxguy` reading `manila.jpg`.
+- On WINSRV1 → *Event Viewer → Security* → filter Event ID 4663 → see `M001` (or whichever user just opened the file) reading `park.jpg`.
 **Marks:** [Crit A7 D121 K=0.5]
 
 ---
@@ -141,9 +155,9 @@ gpresult /v | findstr "certen"
 
 Client3 has only DHCP from ISP and **no domain membership**. Use local Administrator account.
 
-### A8.1 OpenVPN dial-in as `vpnuser`
+### A8.1 OpenVPN dial-in as `VPNUser`
 - Open OpenVPN Connect → import the `.ovpn` file from `20_…` Step 5.5.
-- Connect → enter `vpnuser` / `P@ssw0rd` (LDAP backend on pfSense queries WINSRV1 for VPN Users group).
+- Connect → enter `VPNUser` / `P@ssw0rd` (LDAP backend on pfSense queries WINSRV1 for **VPNGroup** membership per MA2 PDF page 10).
 **Expected:** tunnel green; tunnel IP from 10.8.0.0/24.
 **Marks:** [Crit A8 D123 K=0.5]
 
@@ -159,11 +173,13 @@ nslookup www.manila.com
 - Chrome → `https://www.manila.com` → loads with valid cert.
 **Marks:** [Crit A8 D125 K=0.5]
 
-### A8.4 XMAS scan triggers Snort
+### A8.4 FIN scan triggers Snort
+**Per MA2 PDF page 10** — the rule is for **FIN scan** (`flags: F`), not XMAS scan.
+
 **Tools:** Zenmap (Nmap GUI) on Client3.
 - Disconnect VPN first (we want this to come from "Internet").
-- Run: `nmap -sX -p 1-1024 <pfSense WAN IP>`
-**Expected on pfSense:** *Services → Snort → Alerts* shows `Possible XMAS scan` SID 100001.
+- Run: `nmap -sF -p 1-1024 <pfSense WAN IP>` (the `-sF` flag = FIN scan).
+**Expected on pfSense:** *Services → Snort → Alerts* shows `Possible FIN scan` SID 100001.
 **Marks:** [Crit A8 D126 K=0.4]
 
 ---
@@ -192,4 +208,4 @@ nslookup www.manila.com
 
 If Day 1 totals (A1+A2+A3+A4+A5+A6+A7+A8) are tracked correctly you should be on pace for **23–25 / 25 of Criterion A**.
 
-Next file: **`24_Day2_SecurityHardening.md`** (the Day 2 build module). CTF practice from `50_Day3_CTF_Playbook.md` onward.
+Day 2 (MA2) is now complete. CTF practice from **`50_Day3_CTF_Playbook.md`** onward.

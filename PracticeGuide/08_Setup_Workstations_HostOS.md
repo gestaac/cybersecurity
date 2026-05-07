@@ -162,7 +162,6 @@ Pre-populate these on **both PCs** so during practice you don't waste time typin
 | WinSRV1 IIS test | `https://webtest.manila.com` |
 | LinSRV1 web | `https://www.manila.com` |
 | Burp's CA cert page | `http://burp` |
-| Security Onion SOC | `https://192.168.1.50/` |
 
 ### G.2 Reference (offline-cached PDFs)
 | Name | URL or local path |
@@ -346,4 +345,4 @@ After this file's setup is done, both PCs should:
 
 When all ticked → return to your day plan in `90_Practice_Schedule.md`.
 
-> The next files (`24_Day2_…` Wazuh + OpenVPN VM build, then the CTF playbooks) will be expanded next.
+> Next files: the day-by-day deliverables (`10_…` for Day 1 MA1, `20_…` to `30_…` for Day 2 MA2, `50_…` to `52_…` for Day 3 CTF).

@@ -22,7 +22,7 @@ For practice, build it to the **same starting point**. Then practice the actual 
 | Client2 | PG-LAN | Win 10 Eval | 2 GB | 40 GB | DHCP |
 | Client3 | PG-Internet | Win 10 Eval | 2 GB | 40 GB | DHCP from ISP |
 
-> All passwords default `P@ssw0rd`. ESXi `pmuser / Paul Bocuse` per MA2 line 38 (your real practice can use any).
+> All passwords default `P@ssw0rd`. ESXi credentials per the actual MA2 PDF: `wsauser / Andres@9V4` (IP `192.168.1.1`). Workstation login: `competitor1b / Tagaytay_62&L`.
 
 ---
 
@@ -78,7 +78,7 @@ Listen 10.0.0.10:443
   SSLCertificateKeyFile /etc/pki/tls/private/nm.key
 </VirtualHost>
 ```
-Same for `sc.conf` with 10.0.0.20 / `www.starcity.com.ph`. Generate self-signed certs (per MA2 line 115):
+Same for `sc.conf` with 10.0.0.20 / `www.starcity.com.ph`. Generate self-signed certs (per MA2 PDF page 8 — both test sites are intentionally self-signed):
 ```bash
 for h in nm sc; do sudo openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
    -keyout /etc/pki/tls/private/$h.key -out /etc/pki/tls/certs/$h.crt \
@@ -111,7 +111,7 @@ Then "WAN interface name" → `vmx0` (the first NIC). LAN → `vmx1`. Then it as
 Pick option **2 (Set interface(s) IP address)** → LAN → IPv4 manual → `172.16.100.254 / 24` → no DHCP yet (we'll do via web UI) → no HTTP redirect.
 
 ### Step 2.4 — Open the pfSense web UI from a Client1 VM later
-For now, the pfSense base install is **ready to be configured by competitors** (MA2 line 118). Snapshot.
+For now, the pfSense base install is **ready to be configured by competitors** (MA2 PDF page 8: *"The firewall is installed in its base configuration..."*). Snapshot.
 
 > **Snapshot:** `pfSense-base`.
 
@@ -151,55 +151,69 @@ Same pattern as MA1 (`03_…` Step 1.3). Quick recap of the click path:
 
 After reboot, log in as `MANILA\Administrator / P@ssw0rd`.
 
-#### 3.2.3 — Create the AD groups
+#### 3.2.3 — Create the OUs (Organisational Units)
+Per MA2 PDF Table 3, users are split into **Manila** and **Singapore** OUs.
+
 **Tools:** *Server Manager → Tools → Active Directory Users and Computers*.
 
-Right-click the **Users** container → **New → Group**. For each of the names below, create the group with scope **Global**, type **Security**:
-
-- `customer service`
-- `Graphics`
-- `IT`
-- `executive`
-- `accounting`
+Right-click `manila.com` → **New → Organizational Unit**. Create two OUs:
 - `Manila`
-- `VPN Users`
+- `Singapore`
 
-(7 groups total. Takes ~3 min clicking.)
+#### 3.2.4 — Create the AD groups
+Right-click `manila.com` (or the Users container) → **New → Group**. Scope **Global**, type **Security**. Create:
 
-#### 3.2.4 — Create the AD users
-Right-click **Users** → **New → User**. For each of:
+- `Marketing`
+- `Customer Service`
+- `Sales`
+- `Executive`
+- `IT`
+- `VPNGroup` (per MA2 PDF page 10 — must be named exactly `VPNGroup`)
 
-- Anorbert
-- mratt
-- C1
-- C2
-- gfxguy
-- csguy
-- itguy
-- accuser
-- execuser
-- vpnuser
+(6 groups total.)
 
-Set:
-- *First name + User logon name:* same as the username (lowercase).
-- Password: `P@ssw0rd`.
+#### 3.2.5 — Create the AD users
+Per MA2 PDF Table 3 (page 14). For each user, place them in the matching OU and group.
+
+**Inside the Manila OU:**
+| Username | Display Name | Job Title | Department | Group |
+|---|---|---|---|---|
+| M001 | Brand Marketing Specialist | Brand Marketing Specialist | Marketing | Marketing |
+| M002 | Customer Experience Rep | Customer Experience Representative | Customer Service | Customer Service |
+| M003 | Store Sales | Store Sales | Sales | Sales |
+| M004 | Operations Manager | Operations Manager | Operations and Logistics | Executive |
+| C1 | Technical Support (MNL) | Technical Support | IT | IT |
+
+**Inside the Singapore OU:**
+| Username | Display Name | Job Title | Department | Group |
+|---|---|---|---|---|
+| S001 | Marketing Manager | Marketing Manager | Marketing | Executive |
+| C2 | Technical Support (SG) | Technical Support | IT | IT |
+
+**Plus VPN test user (in Manila OU or Users):**
+| Username | Group |
+|---|---|
+| VPNUser | VPNGroup |
+
+For each user:
+- *First name:* the display name (or just M001/M002/etc.).
+- *User logon name:* M001 / M002 / M003 / M004 / S001 / C1 / C2 / VPNUser.
+- Password: `P@ssw0rd` (and re-confirm — note the project says "do not modify the passwords unless required").
 - UNTICK *"User must change password at next logon"*.
 - TICK *"Password never expires"*.
+- After creation: right-click user → **Properties → Organization** tab → fill in Job Title, Department, City (Manila or Singapore).
 
-(10 users total.)
-
-#### 3.2.5 — Add users to groups
-Open each group, right-click → **Properties → Members → Add**.
+#### 3.2.6 — Add users to groups
+Right-click each group → **Properties → Members → Add**:
 
 | Group | Members |
 |---|---|
-| Graphics | gfxguy |
-| customer service | csguy |
-| IT | itguy |
-| accounting | accuser |
-| executive | execuser |
-| Manila | mratt, Anorbert |
-| VPN Users | vpnuser |
+| Marketing | M001 |
+| Customer Service | M002 |
+| Sales | M003 |
+| Executive | M004, S001 |
+| IT | C1, C2 |
+| VPNGroup | VPNUser |
 
 > *Quick PowerShell alternative for all of Step 3.2:*
 > ```powershell
@@ -208,17 +222,16 @@ Open each group, right-click → **Properties → Members → Add**.
 >   -SafeModeAdministratorPassword (ConvertTo-SecureString "P@ssw0rd" -AsPlainText -Force) `
 >   -InstallDns -Force
 > # ... after reboot:
-> "customer service","Graphics","IT","executive","accounting","Manila","VPN Users" |
+> "Marketing","Customer Service","Sales","Executive","IT","VPNGroup" |
 >   % { New-ADGroup -Name $_ -GroupScope Global -GroupCategory Security }
-> @("Anorbert","mratt","C1","C2","gfxguy","csguy","itguy","accuser","execuser","vpnuser") |
+> @("M001","M002","M003","M004","S001","C1","C2","VPNUser") |
 >   % { New-ADUser -Name $_ -SamAccountName $_ -AccountPassword (ConvertTo-SecureString "P@ssw0rd" -AsPlainText -Force) -Enabled $true -ChangePasswordAtLogon $false }
-> Add-ADGroupMember "Graphics" gfxguy
-> Add-ADGroupMember "customer service" csguy
-> Add-ADGroupMember "IT" itguy
-> Add-ADGroupMember "accounting" accuser
-> Add-ADGroupMember "executive" execuser
-> Add-ADGroupMember "Manila" mratt,Anorbert
-> Add-ADGroupMember "VPN Users" vpnuser
+> Add-ADGroupMember "Marketing" M001
+> Add-ADGroupMember "Customer Service" M002
+> Add-ADGroupMember "Sales" M003
+> Add-ADGroupMember "Executive" M004,S001
+> Add-ADGroupMember "IT" C1,C2
+> Add-ADGroupMember "VPNGroup" VPNUser
 > ```
 
 ### Step 3.3 — DNS records (GUI)
@@ -230,9 +243,8 @@ Right-click **manila.com** → **New Host (A or AAAA)…**. Add three records (o
 
 | Name | IP | What it points to |
 |---|---|---|
-| `www` | `192.168.1.10` | LinSRV1 in DMZ |
-| `webtest` | `192.168.2.30` | WINSRV3 IIS |
-| `w3` | `192.168.2.30` | Chrome homepage GPO target |
+| `www` | `192.168.1.10` | LinSRV1 in DMZ (per MA2 PDF page 11) |
+| `webtest` | `192.168.2.30` | WINSRV3 IIS (per MA2 PDF page 11) |
 
 For each: type the Name, type the IP, click **Add Host** → OK → Done.
 
@@ -243,17 +255,17 @@ For each: type the Name, type the IP, click **Add Host** → OK → Done.
 > Add-DnsServerPrimaryZone -Name "manila.com" -ReplicationScope Forest  # only if zone doesn't exist
 > Add-DnsServerResourceRecordA -ZoneName manila.com -Name "www"     -IPv4Address 192.168.1.10
 > Add-DnsServerResourceRecordA -ZoneName manila.com -Name "webtest" -IPv4Address 192.168.2.30
-> Add-DnsServerResourceRecordA -ZoneName manila.com -Name "w3"      -IPv4Address 192.168.2.30
 > ```
 
-### Step 3.4 — Stage the Chrome Enterprise Bundle
-Copy `googleChromeEnterpriseBundle64.zip` into `C:\Users\Administrator\Documents\` on WINSRV1 (per MA2 line 204).
+<!-- Step 3.4 removed: the new MA2 PDF does not require the Chrome Enterprise Bundle / google GPO. Skip this step. -->
 
 ### Step 3.5 — Pre-create the `pictures` share folder (empty)
+**Per MA2 PDF page 12** — the share is at `C:\shares\pictures` and contains a file called **`park.jpg`**.
+
 ```powershell
 mkdir C:\shares\pictures
-# Drop a placeholder so MA2 line 207 step has something:
-Set-Content C:\shares\pictures\manila.jpg "fake-jpeg-bytes"
+# Drop a placeholder so the MA2 PDF "park.jpg audit" step (page 12) has something to audit:
+Set-Content C:\shares\pictures\park.jpg "fake-jpeg-bytes"
 ```
 
 > **Do NOT** create the share, GPOs, password policy, or audit yet — those are the actual MA2 deliverables you'll do during practice from `22_Day1_MA2_WinSRV1_AD.md`.
@@ -264,7 +276,7 @@ Set-Content C:\shares\pictures\manila.jpg "fake-jpeg-bytes"
 
 ## Part 4 — Issuing CA (WINSRV3, partially configured)
 
-MA2 line 191: *"already configured as the subordinate (issuing) CA for the domain. Complete the following tasks…"*
+MA2 PDF page 11: *"WinSRV3 will be the issuing CA. This machine is already configured as the subordinate (issuing) CA for the domain. Complete the following tasks…"*
 
 ### Step 4.1 — Install Win Server 2022, static IP, domain-join `manila.com` (GUI)
 

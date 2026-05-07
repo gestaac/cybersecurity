@@ -168,25 +168,27 @@ Create these custom VMnets (click *Add Network*):
 | **VMnet11** | Host-only | `172.16.100.0/24` | MA2 LAN: Client1, Client2, pfSense LAN | `PG-LAN` |
 | **VMnet12** | Host-only | `192.168.1.0/24` | MA2 DMZ: LinSRV1, pfSense DMZ | `PG-DMZ` |
 | **VMnet13** | Host-only | `192.168.2.0/24` | MA2 Servers: WinSRV1/3/4, pfSense Servers | `PG-Servers` |
-| **VMnet14** | Host-only | `10.10.10.0/24` | MA1: DC.grimshay, www, AMClient1/2 | `PG-MA1-LAN` |
+| **VMnet15** | Host-only | `192.168.2.0/24` | **MA1: CMS target + Kali** (per MA1 PDF Table 1) | `PG-MA1-CMS` |
 
-> ⚠️ **Note on subnets:** the original `02_Setup_Topology.md` (3-PC ESXi version) reuses `172.16.100.0/24` for both MA1 and MA2 LAN — that works on ESXi because the two port groups are on different vSwitches and never bridge. To keep things cleaner here on a single host, I've moved MA1 LAN to `10.10.10.0/24`. When you build MA1 VMs from `03_Setup_VMs_MA1.md`, **substitute the IPs** as shown in the override table at the bottom of section D.3.
+> ⚠️ **Two VMnets share `192.168.2.0/24` (VMnet13 + VMnet15) — this is fine.** VMware host-only VMnets are physically isolated from each other. VMs on VMnet13 cannot see VMs on VMnet15, even though they share a subnet number. **Just don't power on MA1 + MA2 simultaneously** (a single VM can't be on two VMnets at once anyway).
+>
+> 💡 **Why VMnet15 instead of VMnet14?** VMware reserves VMnet0/1/8 for default networks and VMnet2/14 are sometimes pre-mapped on Workstation Pro. Using VMnet15 avoids any pre-existing mapping. If your install has a free VMnet14, that works too — just keep it consistent in the network mapping table below.
 
 For each one:
 1. Click *Add Network* → choose VMnet number → OK.
 2. Select *Host-only* (not Bridged, not NAT — we want isolation).
 3. Set *Subnet IP* + *Subnet mask* per the table above.
-4. **UNTICK** *"Use local DHCP service"* — we want the lab itself to control DHCP (pfSense will be DHCP for MA2 LAN, ISP for MA2 Internet, etc.). Exception: tick DHCP only for VMnet14 (MA1 LAN) so MA1 clients can boot before AD is configured.
+4. **UNTICK** *"Use local DHCP service"* — we want the lab itself to control DHCP (pfSense will be DHCP for MA2 LAN, ISP for MA2 Internet, etc.). For **VMnet15 (MA1)** you can leave DHCP unticked too — MA1 PDF expects static IPs on the CMS target and Kali (192.168.2.1 and 192.168.2.2).
 5. **TICK** *"Connect a host virtual adapter to this network"* — yes, leave it ticked. ⚠️ **This is required** so the VMnet appears in the VM Settings → Network Adapter → Custom dropdown. (If unticked, VMware Workstation hides the VMnet from the dropdown and you can't assign VMs to it.) The downside is your Windows host gets an IP on each lab subnet — fine for solo practice; it actually helps with troubleshooting (you can `ping` lab VMs directly from Windows).
 
 Apply when done.
 
 > 🔧 **If you already created the VMnets with the host adapter UNticked** and now the dropdown is empty when you go to VM Settings → Network Adapter:
 > 1. Go back to *Edit → Virtual Network Editor → Change Settings* (admin).
-> 2. For each VMnet (10, 11, 12, 13, 14), click it → **tick** *"Connect a host virtual adapter to this network"* → Apply.
+> 2. For each VMnet (10, 11, 12, 13, 15), click it → **tick** *"Connect a host virtual adapter to this network"* → Apply.
 > 3. Now reopen VM Settings → the VMnets appear in the dropdown.
 
-> 💡 You can keep the default **VMnet8 (NAT)** as is — that's the network you'll use for any VM that needs internet (Kali during package installs, the practice host running Juice Shop's `npm start`).
+> 💡 You can keep the default **VMnet8 (NAT)** as is — that's the network you'll use for any VM that needs internet (Kali during package installs / exploit-db updates, or the host running Juice Shop's `npm start`).
 
 ### D.3 Network mapping (when reading the rest of the guide)
 
@@ -196,26 +198,24 @@ When the guide says... | Do this in Workstation
 *ESXi UI → Port Groups → PG-LAN* | *Custom: VMnet11*
 *ESXi UI → Port Groups → PG-DMZ* | *Custom: VMnet12*
 *ESXi UI → Port Groups → PG-Servers* | *Custom: VMnet13*
-*ESXi UI → Port Groups → PG-MA1-LAN* | *Custom: VMnet14*
+*ESXi UI → Port Groups → PG-MA1-CMS* (or `PG-MA1-LAN` in older docs) | *Custom: VMnet15* |
 *Power on a VM in ESXi web UI* | Right-click the VM tab in Workstation → Power On
 *ESXi snapshot* | VM menu → *Snapshot → Take Snapshot…*
 
 The MA1/MA2 build files (`03_…` and `04_…`) reference port groups by name — substitute VMnet numbers as above.
 
-### D.4 IP overrides for MA1 (single-PC mode only)
+### D.4 MA1 IPs match the PDF — no overrides needed
 
-Because MA1 LAN moved to `10.10.10.0/24` here (instead of `172.16.100.0/24`), substitute these IPs when following `03_Setup_VMs_MA1.md`:
+Per **MA1 PDF Table 1**: CMS target = `192.168.2.1`, Kali = `192.168.2.2`. Use these IPs as-is when building the practice MA1 VMs from `03_Setup_VMs_MA1.md`.
 
-| VM | IP in `03_…` (3-PC mode) | IP to use here (single-PC mode) |
+| VM | IP (per MA1 PDF) | VMnet |
 |---|---|---|
-| DC.grimshay.local | 172.16.100.10 | **10.10.10.10** |
-| www.grimshay.ca | 172.16.100.13 | **10.10.10.13** |
-| AMClient1 | 172.16.100.1 | **10.10.10.1** |
-| AMClient2 | 172.16.100.2 | **10.10.10.2** |
+| Linux Server with CMS (e.g. Drupal 7 target) | **192.168.2.1** | VMnet15 |
+| Kali Linux | **192.168.2.2** | VMnet15 |
 
-DNS records, Apache vhost, and any other config that references these IPs needs the same substitution. The MA2 LAN (Client1/Client2 on VMnet11) keeps `172.16.100.x` unchanged — no overlap because they're different VMnets.
-
-> When you migrate later to the 3-PC ESXi rig (per Section H), you can either keep the `10.10.10.x` IPs or re-IP back to `172.16.100.x` — either works because MA1 and MA2 sit on different ESXi port groups.
+> Both VMs sit on **VMnet15** which we set to `192.168.2.0/24`. They reach each other directly. **VMnet13 (MA2 Servers) also has `192.168.2.0/24`** — but VMnet13 and VMnet15 are isolated, so MA1 VMs can't see MA2 VMs and vice versa. No collision.
+>
+> Practice rule: only power on MA1 VMs OR MA2 VMs at a time. Single-PC RAM (16 GB) won't fit both anyway.
 
 ---
 
@@ -225,7 +225,7 @@ Your one PC connects to your home router (WiFi or ethernet) for internet — thi
 
 **No special networking needed for the host itself** — just whatever you normally use to get online. The practice VMs are isolated on their VMnets and only reach the internet if you explicitly attach them to VMnet8 (NAT).
 
-> 🔒 Privacy: the lab VMs (especially the deliberately-vulnerable ones like www.grimshay.ca) **must not** be on Bridged networking — that exposes them to your home network. Always use Host-only VMnets, or NAT only when you specifically need internet for a VM.
+> 🔒 Privacy: the deliberately-vulnerable lab VMs (especially the CMS pentest target) **must not** be on Bridged networking — that exposes them to your home network. Always use Host-only VMnets, or NAT only when you specifically need internet for a VM.
 
 ---
 
@@ -233,16 +233,16 @@ Your one PC connects to your home router (WiFi or ethernet) for internet — thi
 
 With ~9 GB available for VMs on a 16 GB host, run only one phase at a time. Take VM snapshots before powering off so you can resume.
 
-### Session 1 — MA1 morning (assess Apache vulns)
+### Session 1 — Day 1: MA1 CMS pentest (per MA1 PDF)
 Power on:
-- DC.grimshay.local (4 GB)
-- www.grimshay.ca (2 GB)
-- AMClient1 (2 GB)
+- CMS target VM (Drupal 7 / vulnerable Linux box) — 2 GB
+- Kali Linux — 4 GB
 
-Total: **8 GB** ✅
-Leave AMClient2 off — only needed for parallel-team checks.
+Total: **6 GB** ✅ very comfortable on 16 GB host.
 
-### Session 2 — MA2 firewall + LinSRV1 (Person A's morning role)
+> The MA1 PDF (Table 1) only requires 2 VMs (CMS target + Kali). Single-PC practice for MA1 is comfortable on 16 GB.
+
+### Session 2 — Day 2 part A: MA2 firewall + LinSRV1 (Person A's role)
 Power on:
 - pfSense (2 GB)
 - LinSRV1 (2 GB)
@@ -252,7 +252,7 @@ Power on:
 Total: **7 GB** ✅
 Skip WINSRV1/3/4 in this session if memory is tight; pfSense and LinSRV1 work without AD initially.
 
-### Session 3 — MA2 AD + PKI (Person B's afternoon role)
+### Session 3 — Day 2 part B: MA2 AD + PKI (Person B's role)
 Power on:
 - pfSense (2 GB)
 - WINSRV1 (4 GB)
@@ -280,11 +280,9 @@ Power on:
 
 Total: **6 GB** ✅
 
-### ❌ Session you CANNOT do on 16 GB single PC
-**Day 2 Security Onion** needs 16 GB itself just for the SO VM, plus host overhead = won't fit. Options:
-1. Skip SO during single-PC practice; come back to it once you have a 32 GB+ machine.
-2. Reduce SO to 12 GB (`Edit VM settings → Memory`) — sluggish but functional.
-3. Run SO in *Import-only* mode (4 GB minimum, no live monitoring) — useful for forensic PCAP analysis but not for live IR.
+### All sessions fit on 16 GB single PC ✅
+
+The confirmed 3-day structure (MA1 + MA2 + CTF) doesn't require Security Onion or any heavyweight SOC platform. Earlier speculation about a separate Day 2 SOC module turned out to be unnecessary — MA2 PDF IS the entire Day 2 hardening module. Single-PC practice is now end-to-end viable on 16 GB.
 
 ---
 
@@ -292,16 +290,15 @@ Total: **6 GB** ✅
 
 | Practice activity | On 16 GB single PC? |
 |---|---|
-| MA1 morning (Day 1) | ✅ Fully |
+| MA1 (Day 1) — CMS pentest | ✅ Fully |
 | MA2 firewall + LinSRV1 | ✅ Fully (skip WINSRV4) |
 | MA2 AD + GPOs | ✅ Fully |
 | MA2 PKI | ✅ Fully (boot WINSRV4 briefly) |
 | MA2 verification from clients | ✅ Mostly — pick 1 client at a time |
 | CTF Juice Shop (★1 → ★6) | ✅ Fully |
 | CTF VulnHub (any VM) | ✅ Fully (one VM at a time) |
-| Day 2 Security Onion (live monitoring) | ❌ No (needs 16 GB just for SO) |
-| Day 2 Security Onion (PCAP import only) | ⚠️ Yes if you reduce SO to 4 GB |
-| Day 2 OpenVPN service install | ✅ Fully |
+| Day 2 (MA2 — Security Hardening): pfSense + AD GPOs + LinSRV1 hardening + PKI | ✅ Fully |
+| Day 2 OpenVPN setup (the one in MA2 PDF) | ✅ Fully |
 
 ---
 
@@ -330,26 +327,41 @@ For each VM you've built and snapshotted:
 - [ ] Antivirus exclusions added for `D:\VMware`, `D:\ISO`, `D:\VulnHub`, `D:\juice-shop`
 - [ ] Power plan: Best performance, never sleep
 - [ ] VMware Workstation Pro 17 installed and licensed
-- [ ] VMnet10–14 created in Virtual Network Editor with the correct subnets
-- [ ] All 4 OS ISOs downloaded to `D:\ISO\`
+- [ ] VMnet10, 11, 12, 13, 15 created in Virtual Network Editor with the correct subnets
+- [ ] All 4 OS ISOs downloaded to `D:\ISO\` (pfSense, CentOS, Win Server 2022, Win 10)
+- [ ] Kali Linux VMware image extracted to `D:\Kali\` (used by both MA1 + CTF)
 - [ ] You understand which VMnet each VM should attach to (table in section D.3)
 
-When all ticked → start `03_Setup_VMs_MA1.md`. Whenever it says "PG-MA1-LAN", attach the VM's network adapter to **VMnet14** instead.
+When all ticked → start `03_Setup_VMs_MA1.md`.
+
+**Quick reference for the new MA1 (per PDF):**
+- `03_…` builds 2 VMs only: CMS target on VMnet15 with IP `192.168.2.1`, Kali on VMnet15 with IP `192.168.2.2`.
+- Workstation login during MA1: `competitor1a / Boracay@14!`.
+- Workstation login during MA2: `competitor1b / Tagaytay_62&L`.
+
+For MA2 references in `04_…` and `20_…`+:
+- `PG-Internet` → VMnet10
+- `PG-LAN` → VMnet11
+- `PG-DMZ` → VMnet12
+- `PG-Servers` → VMnet13
+- ESXi credentials (the `wsauser/Andres@9V4` mention in the PDF) — ignore on single-PC mode (no ESXi).
 
 ---
 
 ## J. Honest expectations for solo-PC practice
 
 You can comfortably learn:
-- The **MA1 + MA2 deliverables top-to-bottom** (estimate: 80% of what the actual competition tests).
+- **MA1 deliverables top-to-bottom** — the new 4-task PDF is a 2-VM pentest, runs perfectly on a single 16 GB PC.
+- **MA2 deliverables top-to-bottom** — all 11 GPOs, firewall, PKI, AD, LinSRV1, verification (estimate: 95% of what competition tests).
 - Every **Juice Shop challenge** ★1 → ★6.
-- **Boot-to-root methodology** on any VulnHub VM.
+- **Boot-to-root methodology** on any VulnHub VM (which is what MA1 also tests).
 
 You will NOT be able to fully simulate:
-- **Day 2 live Security Onion monitoring** (need 32 GB+).
-- **Two teammates working in parallel on different VMs** (need a second PC).
-- **The exact 3-box topology** with eSXi web UI workflow.
+- **Two teammates working in parallel on different VMs at the same time** (need a second PC).
+- **The exact 3-box topology** with the ESXi web UI workflow.
 
 That's fine — once you have the proper hardware, your skills transfer 100%. The lab topology is just a vehicle for the security work; the security work itself is identical.
 
-Now go to **`03_Setup_VMs_MA1.md`** and start building MA1. Remember: when it says `PG-MA1-LAN`, you select **VMnet14**.
+Now go to **`03_Setup_VMs_MA1.md`** and start building MA1.
+
+When `03_…` references `VMnet15` (or `PG-MA1-CMS` in older versions), use **VMnet15** in your Network Adapter dropdown. The CMS target gets `192.168.2.1` and Kali gets `192.168.2.2`, exactly as the MA1 PDF specifies.

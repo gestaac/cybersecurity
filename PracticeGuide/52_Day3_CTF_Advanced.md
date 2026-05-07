@@ -1,8 +1,9 @@
-# 52 — Day 4 CTF: Harder VulnHub VM Walkthroughs + Juice Shop Hard
+# 52 — Day 3 CTF: Advanced VulnHub Walkthroughs + Juice Shop Hard
 
-> Day plan reminder: this is **Day 4** in the new schedule. By now you've completed Day 1 (MA1+MA2), Day 2 (Security Hardening / SOC), Day 3 morning (Juice Shop warm-up), Day 3 afternoon (first VulnHub VM). Day 4 is the harder stuff.
+> **Day plan reminder:** confirmed 3-day competition. By now you've completed Day 1 (MA1 — CMS pentest) and Day 2 (MA2 — Security Hardening). Day 3 is CTF — chief said random-pick from VulnHub, possibly with Juice Shop component.
 
-**Time:** 6 hours.
+**Time:** Day 3 is 6 hours total. Sequence: `50_…` (Juice Shop warm-up) → `51_…` (boot-to-root methodology + 1 medium VM) → **this file** if time remains or if the chief picks a harder target.
+
 **Pre-req:** `06_Setup_VulnHub.md` and `51_Day3_VulnHub_BootToRoot.md` complete.
 
 This file gives **concrete walkthroughs** for the most-likely VulnHub VMs. Practising on these directly **is** the best preparation — the chief said random-pick from VulnHub, and these are statistically the most popular targets.
@@ -295,7 +296,7 @@ The chief implied **multiple sources** (Juice Shop + VulnHub random pick). The r
 |---|---|---|
 | Day 2 (warm-up) | Juice Shop ★1–★3 | `40_…` |
 | Day 3 | 1 medium VulnHub VM (e.g. DC-1, Mr. Robot) + ★4 Juice Shop | `41_…` boot-to-root section |
-| Day 4 | 1 harder VulnHub VM (DC-3+, Kioptrix) + ★5+ Juice Shop | this file |
+| Day 3 (advanced) | 1 harder VulnHub VM (DC-3+, Kioptrix) + ★5+ Juice Shop | this file |
 
 If days are different — adapt. The methodology is identical, only the time-allocation changes.
 
@@ -309,8 +310,8 @@ If days are different — adapt. The methodology is identical, only the time-all
 | Day 2 | Juice Shop: Login Admin | ★2 | ☐ | __ | __ |
 | Day 3 | DC-1 (foothold) | mid | ☐ | __ | __ |
 | Day 3 | DC-1 (privesc) | mid | ☐ | __ | __ |
-| Day 4 | DC-2 (foothold + privesc) | mid | ☐ | __ | __ |
-| Day 4 | Juice Shop: Forged JWT | ★6 | ☐ | __ | __ |
+| Day 3 (advanced) | DC-2 (foothold + privesc) | mid | ☐ | __ | __ |
+| Day 3 (advanced) | Juice Shop: Forged JWT | ★6 | ☐ | __ | __ |
 
 Convert to flag IDs once the chief publishes the ASEAN→VM mapping.
 

@@ -1,4 +1,4 @@
-# 21 — Day 1 PM (MA2) — LINSRV1 Hardening (CentOS Stream 9)
+# 21 — Day 2 (MA2) — LINSRV1 Hardening (CentOS Stream 9)
 
 **Target time:** 60 min.
 **Owner:** Person B.
@@ -32,7 +32,7 @@ id Administrator@manila.com
 ## Step 2 — Allow C1 + C2 domain users (and create local fallbacks)
 **Why:** marking scheme accepts either domain or local accounts.
 
-Create matching local accounts as a safety net (per MA2 line 212):
+Create matching local accounts as a safety net (per MA2 PDF page 12: *"If domain integration fails, create local users C1 and C2 matching the expected credentials"*):
 ```bash
 sudo useradd -m C1
 sudo useradd -m C2
@@ -65,8 +65,11 @@ Edit `/etc/ssh/sshd_config`:
 ```bash
 sudo sed -i 's/^#Port 22/Port 2022/' /etc/ssh/sshd_config
 sudo sed -i 's/^#PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config
+sudo sed -i 's/^#MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config
 sudo bash -c 'echo "AllowUsers C1 C2 C1@manila.com C2@manila.com" >> /etc/ssh/sshd_config'
 ```
+
+> **Per MA2 PDF page 13:** *"Limit maximum authentication attempts to 3."* — that's the `MaxAuthTries 3` line above.
 
 SELinux still allows port 22 only by default — add 2022:
 ```bash
@@ -200,7 +203,16 @@ sudo cp manila-ca-chain.cer /etc/pki/ca-trust/source/anchors/
 sudo update-ca-trust extract
 ```
 
-### 7.4 Apache vhost (HTTPS)
+### 7.4 Apache vhost (HTTPS + domain-user-only access)
+
+**Per MA2 PDF page 13:** *"Limit the website's exposure to domain users only. A domain user should be able to access the website from the Internet through his/her domain login credential."* — so we need **HTTP basic auth backed by AD** in addition to HTTPS.
+
+#### 7.4.1 — Install mod_authnz_ldap
+```bash
+sudo dnf install -y mod_ldap mod_authnz_ldap openldap-clients
+```
+
+#### 7.4.2 — Apache vhost
 Edit `/etc/httpd/conf.d/manila.conf`:
 ```apache
 <VirtualHost *:80>
@@ -216,11 +228,32 @@ Edit `/etc/httpd/conf.d/manila.conf`:
   SSLCertificateKeyFile /etc/pki/tls/private/manila.key
   SSLProtocol TLSv1.2 TLSv1.3
   SSLCipherSuite HIGH:!aNULL:!MD5
+
+  <Directory /var/www/manila>
+    AuthType Basic
+    AuthName "Manila Domain Users Only"
+    AuthBasicProvider ldap
+    # Use ldaps:// if you've imported the WinSRV3 cert chain; ldap:// works for practice
+    AuthLDAPURL "ldap://192.168.2.10:389/DC=manila,DC=com?sAMAccountName?sub?(objectClass=user)"
+    AuthLDAPBindDN "CN=Administrator,CN=Users,DC=manila,DC=com"
+    AuthLDAPBindPassword "P@ssw0rd"
+    Require valid-user
+  </Directory>
 </VirtualHost>
 ```
+
+> **Better practice for production:** use `ldaps://` (port 636) so the bind credentials don't transit cleartext. For the MA2 deliverable, `ldap://` satisfies the requirement; mention the `ldaps://` recommendation in the Table 2 GPO/risk discussion.
+
+#### 7.4.3 — SELinux: allow httpd to LDAP
 ```bash
+sudo setsebool -P httpd_can_connect_ldap 1
 sudo apachectl configtest && sudo systemctl restart httpd
 ```
+
+#### 7.4.4 — Verify
+From Client1 (domain user M001 logged in):
+- Browse to `https://www.manila.com` → prompted for credentials → enter `M001 / P@ssw0rd` → page loads.
+- Without domain credentials → 401 Unauthorized.
 **Verify** from Client1 (after Step 8 of WinSRV1 file gives Client1 the trusted root via GPO):
 ```
 https://www.manila.com → no certificate warning, padlock shows chain Manila-Root-CA → WINSRV3 → www.manila.com

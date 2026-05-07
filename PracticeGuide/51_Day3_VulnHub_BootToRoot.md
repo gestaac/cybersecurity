@@ -1,8 +1,8 @@
-# 51 — Day 3 (CTF afternoon) — VulnHub Boot-to-Root Playbook + Juice Shop Medium
+# 51 — Day 3 CTF: VulnHub Boot-to-Root Playbook + Juice Shop Medium
 
-> Day plan reminder: this is **Day 3 afternoon** in the new schedule (Day 1 = MA1+MA2; Day 2 = Security Hardening; Day 3 = CTF starts; Day 4 = CTF continues). If the chief confirms different days, the methodology still applies regardless of which day you do it on.
+> **Day plan reminder:** confirmed 3-day competition. Day 1 = MA1 (CMS pentest), Day 2 = MA2 (Security Hardening), **Day 3 = CTF (this file + `50_…` warm-up + `52_…` advanced)**. The boot-to-root methodology in this file applies to whichever VulnHub VM the chief randomly picks.
 
-**Time:** ~3 hours after the Day 3 morning Juice Shop warm-up (`50_…`).
+**Time:** ~3 hours after the Juice Shop warm-up in `50_…`.
 **Pre-req:** `05_Setup_JuiceShop.md` and `06_Setup_VulnHub.md` complete; Kali VM running.
 
 This file covers the **universal boot-to-root playbook** that works for any VulnHub VM, plus a quick reference for Juice Shop ★3–★4 challenges.
@@ -422,4 +422,4 @@ Inspect `package.json` of your local Juice Shop install → find a deprecated de
 
 If you exceed 4 h — read the VM author's hint on VulnHub (during practice only).
 
-Next file: **`52_Day4_CTF_Hard.md`** — concrete walkthroughs for the most popular VMs + Juice Shop hard.
+Next file: **`52_Day3_CTF_Advanced.md`** — concrete walkthroughs for the most popular VMs + Juice Shop hard.

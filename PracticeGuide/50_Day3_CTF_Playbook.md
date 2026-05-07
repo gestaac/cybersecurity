@@ -1,6 +1,6 @@
 # 50 — Day 3 (CTF morning) — OWASP Juice Shop: Methodology + Easy (★1–★2)
 
-> Day plan reminder: Day 1 = MA1+MA2; **Day 3 morning = Security Hardening (`24_…`)**; **Day 3 (this file) + Day 4 = CTF.**
+> **Day plan reminder:** confirmed 3-day competition. Day 1 = MA1 (CMS pentest), Day 2 = MA2 (Security Hardening), **Day 3 = CTF (this file + `51_…` + `52_…`)**.
 
 **Time budget:** ~3 hours warm-up on Day 3 morning, then VulnHub afternoon. Adjust if the actual schedule varies.
 **Target:** `http://localhost:3000` (your local instance from `05_Setup_JuiceShop.md`).

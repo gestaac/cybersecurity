@@ -15,15 +15,16 @@ This calendar assumes you and your teammate can practice **3 hours per evening**
 - [ ] **Reference:** `01_Setup_Tools.md`
 
 ### Day 2 (Tue) — ESXi + topology (3 h)
-- [ ] Install ESXi 8 on team server.
-- [ ] Create 5 vSwitches + port groups (PG-Internet, PG-LAN, PG-DMZ, PG-Servers, PG-MA1-LAN).
-- [ ] Confirm ESXi reachable from both laptops.
-- [ ] **Reference:** `02_Setup_Topology.md`
+- [ ] Install ESXi 8 on team server (3-PC mode) OR set up VMnets (single-PC mode).
+- [ ] Create 5 vSwitches + port groups (PG-Internet, PG-LAN, PG-DMZ, PG-Servers, PG-MA1-CMS).
+- [ ] Confirm ESXi reachable from PC1 and PC2.
+- [ ] **Reference:** `02_Setup_Topology.md` (3-PC) or `02b_…` (single-PC)
 
-### Day 3 (Wed) — Build MA1 environment (3 h)
-- [ ] DC.grimshay.local (90 min)
-- [ ] www.grimshay.ca with deliberate flaws (60 min)
-- [ ] AMClient1 + AMClient2 (30 min)
+### Day 3 (Wed) — Build MA1 environment (CMS pentest target + Kali, 3 h)
+- [ ] CMS target VM — Drupal 7 LAMP install on CentOS or Ubuntu (60 min)
+- [ ] Bake in the deliberate flaws (weak `john` user + sudo NOPASSWD vim privesc) (15 min)
+- [ ] Import Kali Linux VM, set static IP `192.168.2.2` (30 min)
+- [ ] Verify `nmap 192.168.2.1` from Kali shows ports 22 + 80
 - [ ] Snapshots taken
 - [ ] **Reference:** `03_Setup_VMs_MA1.md`
 
@@ -59,50 +60,43 @@ This calendar assumes you and your teammate can practice **3 hours per evening**
 
 ---
 
-## Week 2 — Repeat Day 1 + CTF skill drills
+## Week 2 — Repeat dry-runs + CTF skill drills
 
-### Day 8 (Mon) — Day 1 dry-run #3, against the clock (6 h)
+### Day 8 (Mon) — MA1 (Day 1 pentest) dry-run #3, against the clock (3 h)
 - [ ] Restore snapshots, no peeking at the guide.
-- [ ] Goal: ≥ 22/25.
+- [ ] Run the 4-task MA1 pentest in ≤ 2.5 hours.
+- [ ] Goal: full Q&A answers + 150-word summary + top-3 risks completed.
+- [ ] **Reference:** `10_Day1_MA1_Solution.md`
 
-### Day 9 (Tue) — Day 2 prep: Security Onion + OpenVPN (3 h)
-- [ ] Download Security Onion 2.4 ISO (~9 GB).
-- [ ] Build SO Eval VM (16 GB RAM, 300 GB disk, 2 NICs).
-- [ ] Run setup wizard, verify SOC web UI loads.
-- [ ] Install Wazuh agent on a Linux + Windows test client.
-- [ ] Trigger `curl http://testmyids.com/uid/index.html` — confirm alert in SOC UI.
-- [ ] Snapshot SO clean.
-- [ ] **Reference:** `07_Setup_SecurityOnion.md`, `24_Day2_SecurityHardening.md` Phase 1
+### Day 9 (Tue) — MA2 (Day 2 hardening) dry-run #3, against the clock (3 h)
+- [ ] Restore snapshots.
+- [ ] Run firewall + LinSRV1 + WinSRV1 + PKI + verification in ≤ 5 hours.
+- [ ] Goal: ≥ 22/25 marks for Criterion A2–A8.
+- [ ] **Reference:** `20_…` through `30_…`
 
-### Day 10 (Wed) — Day 2 dry-run + CTF tooling (3 h)
-- [ ] Day 2 dry-run: deploy SO + OpenVPN service (1.5 h).
-- [ ] CTF tooling: Node.js 20 LTS + Juice Shop ZIP from `https://github.com/juice-shop/juice-shop/releases/latest` running on `http://localhost:3000`.
-- [ ] Import Kali, attach to VMnet1 Host-Only with DHCP.
-- [ ] Install Burp, jwt_tool, sqlmap, ffuf, GTFOBins offline.
-- [ ] Build CyberChef offline.
-- [ ] Download Pwning OWASP Juice Shop PDF + EPUB.
+### Day 10 (Wed) — CTF tooling install + Juice Shop ★1–★2 (3 h)
+- [ ] Node.js 20 LTS + Juice Shop ZIP running on `http://localhost:3000`.
+- [ ] Burp + Firefox + CA cert imported (`05_…` Step 5).
+- [ ] Solve every Juice Shop ★1 + ★2 challenge.
 - [ ] In parallel: download all 8 VulnHub VMs (`06_…` Part F) → `D:\VulnHub\`.
-- [ ] **Reference:** `24_…`, `05_…`, `06_…`
+- [ ] **Reference:** `05_…`, `06_…`, `50_…`
 
-### Day 11 (Thu) — Juice Shop ★1–★3 (3 h)
-- [ ] Find the score-board (★1).
-- [ ] Solve every ★1 + ★2 challenge.
-- [ ] Start ★3 — at least 5 of them.
-- [ ] **Reference:** `50_Day3_CTF_Playbook.md`
-
-### Day 12 (Fri) — VulnHub Boot-to-Root drill #1 (3 h)
+### Day 11 (Thu) — VulnHub Boot-to-Root drill #1 (3 h)
 - [ ] Spin up **Basic Pentesting: 1** → root.
 - [ ] Spin up **DC-1** → 5 flags + root via SUID find.
 - [ ] Internalise: Phase 1–5 of the boot-to-root playbook.
-- [ ] **Reference:** `51_Day3_VulnHub_BootToRoot.md`, `52_Day4_CTF_Hard.md` Walkthroughs 1+3
+- [ ] **Reference:** `51_Day3_VulnHub_BootToRoot.md`, `52_Day3_CTF_Advanced.md` Walkthroughs 1+3
 
-### Day 13 (Sat) — Mock full 4-day run (6 h)
-- [ ] Hour 0–1: MA1 mock (compressed, 1 h).
-- [ ] Hour 1–2.5: MA2 mock (compressed, 1.5 h).
-- [ ] Hour 2.5–4: Day 2 mock — re-deploy SO + Wazuh agent + investigate one alert (1.5 h).
-- [ ] Hour 4–4.5: Juice Shop sprint — 6 challenges in 30 min, no ebook.
-- [ ] Hour 4.5–6: Pick a VulnHub VM you HAVEN'T done (e.g. Mr. Robot, DC-2, Kioptrix Level 1). Try root in 1.5 hours.
-- [ ] Score yourself.
+### Day 12 (Fri) — VulnHub Boot-to-Root drill #2 (3 h)
+- [ ] Spin up **Mr. Robot: 1** → 3 keys.
+- [ ] Spin up **DC-2** → wpscan + rbash escape + sudo git privesc.
+- [ ] **Reference:** `52_Day3_CTF_Advanced.md` Walkthroughs 2+4
+
+### Day 13 (Sat) — Mock full 3-day run (6 h)
+- [ ] Hour 0–2: MA1 mock (full pentest + report).
+- [ ] Hour 2–5: MA2 mock (full hardening — pfSense + GPOs + LinSRV1 + PKI + verify).
+- [ ] Hour 5–6: Pick a VulnHub VM you HAVEN'T done (e.g. Kioptrix Level 1, Basic Pentesting 2). Try root.
+- [ ] Score yourself against `99_Marking_Map.md`.
 
 ### Day 14 (Sun) — Reset + final polish (3 h)
 - [ ] Re-snapshot every clean VM.
@@ -127,12 +121,10 @@ Each session:
 - USB stick (per Infrastructure-List): 4 patch cords, your laptop with VMware Workstation, your ESXi server, unmanaged switch, power extension.
 - Backup USB(s) — minimum **128 GB total** (or use a **1 TB external SSD** — recommended given that PCs only have 500 GB internal each) — with:
   - All Day-1 OS ISOs (pfSense, CentOS, Win Server 2022, Win 10).
-  - **Security Onion 2.4 ISO (~9 GB).**
   - Kali Linux VM image.
   - All 8 recommended VulnHub VMs (`06_…` Part F) — about 50 GB.
   - Juice Shop offline ZIP + Pwning Juice Shop PDF/EPUB.
   - HackTricks PDF, GTFOBins offline mirror, LinPEAS/WinPEAS, LinEnum.sh.
-  - **Wazuh agent installers** (Linux RPM + Windows MSI).
   - SecLists, rockyou.txt extracted.
   - This entire `PracticeGuide/` folder.
 - Notepad (paper) for sketching network diagrams during MA2.
@@ -149,7 +141,7 @@ Each session:
 - [ ] You can forge a Juice Shop admin JWT from memory (no ebook).
 - [ ] You can root **at least 4 VulnHub VMs** (e.g. Basic Pentesting 1, DC-1, DC-2, Mr. Robot) without peeking at write-ups.
 - [ ] You can recite the Phase 1–5 boot-to-root playbook (Discover → Enumerate → Foothold → Privesc → Loot) and the top 5 Linux privesc checks.
-- [ ] You can deploy a Security Onion Eval install from snapshot in ≤ 30 min and onboard a Wazuh agent.
+- [ ] You can build a CMS pentest target VM (CMS + weak user + privesc) from snapshot in ≤ 15 min.
 - [ ] You can stand up a Linux OpenVPN server (with cert chain) in ≤ 45 min.
 - [ ] Your teammate can execute any MA2 step you can (no single point of failure).
 

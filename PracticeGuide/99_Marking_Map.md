@@ -28,26 +28,23 @@ Verified directly from column **C** (Day of Marking) of the spreadsheet:
 
 ### What this means literally
 
-The **spreadsheet** marks 4 competition days with the following day-by-day pattern:
+The **spreadsheet** has a 4-day skeleton:
 - Day 1: Criterion A (MA1 + MA2 work)
-- Day 2: Criterion B — "HO Flags" + "Casual Malware Flags" (CTF-style)
-- Day 3: Criterion C — "ODD Flags" + "Cache-Cache Flags" (CTF-style)
-- Day 4: Criterion D — "Blueday Flags" (CTF-style)
+- Day 2: Criterion B — "HO Flags" + "Casual Malware Flags" (CTF-style names)
+- Day 3: Criterion C — "ODD Flags" + "Cache-Cache Flags" (CTF-style names)
+- Day 4: Criterion D — "Blueday Flags" (CTF-style names)
 
-### ⚠️ But the spreadsheet contradicts what the chief told us
+### ⚠️ The spreadsheet's 4-day skeleton doesn't match reality
 
-Per chief Marlon's confirmation:
-- **Day 2 = "Security Hardening from scratch"** with **Security Onion + OpenVPN** as named tools.
-- **Days 3–4 CTF** uses **OWASP Juice Shop + random-pick VulnHub VMs**.
+**Confirmed competition structure (per chief Marlon):** 3 days, not 4.
 
-Compare:
+| Day in spreadsheet | Reality at competition |
+|---|---|
+| Day 1 (MA1+MA2 = Crit A) | **Day 1 = MA1 (CMS pentest only)** — `testpacakge_pdf/WSA2025_TP54_MA1_*.pdf` |
+| Day 2 (Lyon CTF flag names) | **Day 2 = MA2 (Security Hardening)** — `testpacakge_pdf/WSA2025_TP54_MA2_*.pdf`. The MA2 PDF IS the Day 2 module Marlon mentioned; the Lyon flag-name rows are placeholders. |
+| Day 3 + Day 4 (Lyon CTF flag names) | **Day 3 = CTF** — random-pick from VulnHub + Juice Shop. Just 1 day, not 2. |
 
-| Day | Marking scheme says (literal) | Reality per chief Marlon | Title of criterion (in spreadsheet) |
-|---|---|---|---|
-| **1** | MA1 + MA2 (Crit A, 25 marks) | ✅ Same | "Enterprise Infrastructure Security" |
-| **2** | "HO Flags" + "CM Flags" CTF (Crit B, 25 marks) | ⚠️ Lyon-leftover row names. Reality = **Security Hardening (SOC + OpenVPN + IR + forensics + AppSec)** | "Cyber Security Incident Response, Digital Forensics, Application Security" — title matches reality, **not** the row names |
-| **3** | "ODD Flags" + "Cache-Cache" Red CTF (Crit C, 25 marks) | Likely first CTF day — Juice Shop + VulnHub | "Red CTF" |
-| **4** | "Blueday Flags" / CS Flags (Crit D, 25 marks) | Likely second CTF day — harder VulnHub + Juice Shop ★5–★6 | "Blue CTF" |
+The marking-scheme **K-values still total 25 per criterion = 100 overall**. The chief will likely rebalance row names before competition; until then the K totals are still meaningful.
 
 ### Why the discrepancy exists
 
@@ -64,7 +61,7 @@ So the **DAY numbers and TITLES are reliable**; the **row names are not**.
 | Day | What the guide covers | File(s) |
 |---|---|---|
 | 1 | MA1 + MA2 walkthroughs (matches spreadsheet exactly) | `10_…`, `20_…` to `30_…` |
-| 2 | Security Hardening (SOC + OpenVPN + IR + forensics + AppSec) — matches Crit B title, not row names | `24_Day2_SecurityHardening.md`, `07_Setup_SecurityOnion.md` |
+| 2 | MA2 (full Security Hardening per PDF) | `20_…` through `30_…` |
 | 3 | CTF: Juice Shop ★1–★4 + first VulnHub VM (boot-to-root) | `50_…`, `51_…` |
 | 4 | CTF: harder VulnHub + Juice Shop ★5–★6 | `52_…` |
 
@@ -74,14 +71,16 @@ When the chief releases the official **Day 2 deliverables doc** and the **ASEAN 
 
 ## Criterion A — Day 1 (Max 25)
 
-### A1 — Morning of Day 1, Security Assessments
+### A1 — Morning of Day 1, CMS Pentest (per MA1 PDF — 4 tasks)
 | Row | Aspect | K | Solved in | Earned? |
 |---|---|---|---|---|
-| D31 | ≥ 2 Apache vulnerabilities identified (Meas) | 2.0 | `10_…` Phase 2 | ☐ |
-| D32 | Executive summary (Judg, max 3) | 2.0 | `10_…` Step 4.2 | ☐ |
-| D37 | 1st vulnerability write-up (Judg, max 3) | 1.0 | `10_…` Step 4.3 | ☐ |
-| D42 | 2nd vulnerability write-up (Judg, max 3) | 1.0 | `10_…` Step 4.4 | ☐ |
+| D31 | Information Gathering (services + secret) — Task 1 | 2.0 | `10_…` Task 1 | ☐ |
+| D32 | Executive summary (≤150 words, top 3 risks) | 2.0 | `10_…` Task 4 | ☐ |
+| D37 | CMS Vulnerability Assessment + sensitive info (Task 2) | 1.0 | `10_…` Task 2 | ☐ |
+| D42 | System Security Weaknesses + privesc to root (Task 3) | 1.0 | `10_…` Task 3 | ☐ |
 | **A1 subtotal** | | **6.0** | | |
+
+> ⚠️ Lyon row names (D31/D32/D37/D42) don't match the actual MA1 PDF tasks 1:1. The K-values still total 6.0; the **mapping is best-guess** until the chief publishes an updated marking scheme aligned to the 4-task PDF structure.
 
 ### A2 — Firewall (pfSense)
 | Row | Aspect | K | Solved in | Earned? |
@@ -120,21 +119,26 @@ When the chief releases the official **Day 2 deliverables doc** and the **ASEAN 
 ### A4 — WinSRV1 (AD)
 | Row | Aspect | K | Solved in | Earned? |
 |---|---|---|---|---|
-| D80 | certenroll GPO (autoenroll) (Meas) | 0.4 | `22_…` Step 7 | ☐ |
-| D81 | google GPO (Meas) | 0.3 | `22_…` Step 6 | ☐ |
-| D82 | pictures share exists (Meas) | 0.2 | `22_…` Step 8.1 | ☐ |
-| D83 | share permissions (Meas) | 0.2 | `22_…` Step 8.2 | ☐ |
-| D84 | Table 2 GPO recommendations (Judg, max 3) | 0.7 | `22_…` Step 10 | ☐ |
-| D89 | Best-practice perm setup (Judg, max 3) | 0.5 | `22_…` Step 8.2 | ☐ |
+| D80 | certenroll GPO (autoenroll) (Meas) | 0.4 | `22_…` Step 8 | ☐ |
+| D81 | (Lyon-leftover, was google GPO — replaced by lockout/restrict-CP/disabled-add-remove/autolock per MA2 PDF) | 0.3 | `22_…` Steps 4–7 | ☐ |
+| D82 | pictures share exists (Meas) | 0.2 | `22_…` Step 9 | ☐ |
+| D83 | share permissions Marketing=R/Executive=FC (Meas) | 0.2 | `22_…` Step 9 | ☐ |
+| D84 | Table 2 GPO recommendations (Judg, max 3) | 0.7 | `22_…` Step 11 | ☐ |
+| D89 | Best-practice perm setup (Judg, max 3) | 0.5 | `22_…` Step 9 | ☐ |
 | **A4 subtotal** | | **2.3** | | |
 
-> ⚠️ **Uncredited but required in MA2:**
-> - Domain password policy 8-char/monthly → `22_…` Step 1
-> - Fine-grained 10-char password policy for `executive` → Step 2
-> - `control` GPO restricting Control Panel for accounting → Step 4
-> - `registry` GPO blocking reg tools for Manila users → Step 5
+> ⚠️ **MA2 PDF (page 11) lists 7 GPOs as required — many are uncredited in the Lyon-leftover marking-scheme rows.** All are documented in `22_…`:
+> - Domain pwd policy 8-char + history 30 → Step 1
+> - Fine-grained 16-char for Executive → Step 2
+> - LoginBanner ("WorldSkills ASEAN Manila" / "Authorized access only") → Step 3
+> - `lockout` GPO (3 attempts / 60 sec) → Step 4
+> - `restrict control panel` (everyone except Executive) → Step 5
+> - `disabled add and remove program panel` (Executive only) → Step 6
+> - `autolock` (Executive only, 10 sec inactivity) → Step 7
+> - `certenroll` (autoenroll certs) → Step 9
+> - `pictures` share (Marketing=R, Executive=FC) + `park.jpg` audit → Steps 10–11
 >
-> Do them anyway — small time, big risk if marking scheme gets patched.
+> Do all of them — these are explicit MA2 PDF requirements, regardless of whether the marking scheme has aligned rows.
 
 ### A5 — WINSRV3 (CA)
 | Row | Aspect | K | Solved in | Earned? |
@@ -154,7 +158,7 @@ When the chief releases the official **Day 2 deliverables doc** and the **ASEAN 
 | D103 | PKI chain check (Meas) | 0.4 | `30_…` A6.7 | ☐ |
 | D104 | GPO certenroll worked (Meas) | 0.5 | `30_…` A6.8 | ☐ |
 | D105 | SNORT logged web (Meas) | 0.5 | `30_…` A6.9 | ☐ |
-| D106 | SNORT XMAS rule present (Meas) | 0.3 | `30_…` A6.10 | ☐ |
+| D106 | SNORT FIN-scan rule present (Meas — Lyon row says XMAS, MA2 PDF page 10 says FIN) | 0.3 | `30_…` A6.10 | ☐ |
 | D107 | GPO recommendations applied (Judg, max 3) | 0.6 | `22_…` Step 10 + `30_…` | ☐ |
 | **A6 subtotal** | | **4.1** | | |
 
@@ -165,10 +169,10 @@ When the chief releases the official **Day 2 deliverables doc** and the **ASEAN 
 | D114 | Cert chain at https://webtest (Meas) | 0.3 | `30_…` A7.2 | ☐ |
 | D115 | DNS resolves www.manila.com (Meas) | 0.2 | `30_…` A7.3 | ☐ |
 | D116 | certenroll GPO scope (Meas) | 0.3 | `30_…` A7.4 | ☐ |
-| D117 | Chrome homepage forced (Meas) | 0.2 | `30_…` A7.5 | ☐ |
-| D118 | google GPO applied (Meas) | 0.2 | `30_…` A7.5 | ☐ |
+| D117 | (Lyon-leftover, was Chrome homepage — replaced by lockout/autolock verification per MA2 PDF) | 0.2 | `30_…` A7.5 | ☐ |
+| D118 | (Lyon-leftover) | 0.2 | replaced by lockout/restrict-CP verification at client | ☐ |
 | D119 | Login banner (Meas) | 0.3 | `30_…` A7.6 | ☐ |
-| D120 | Share readable as graphics (Meas) | 0.3 | `30_…` A7.7 | ☐ |
+| D120 | Share readable as Marketing (M001) + writable as Executive (M004) per MA2 PDF page 12 | 0.3 | `30_…` A7.7 | ☐ |
 | D121 | Auditing logged (Meas) | 0.5 | `30_…` A7.8 | ☐ |
 | **A7 subtotal** | | **2.6** | | |
 
@@ -178,7 +182,7 @@ When the chief releases the official **Day 2 deliverables doc** and the **ASEAN 
 | D123 | OpenVPN dial-in (Meas) | 0.5 | `30_…` A8.1 | ☐ |
 | D124 | DNS over VPN (Meas) | 0.3 | `30_…` A8.2 | ☐ |
 | D125 | Reach DMZ website from outside (Meas) | 0.5 | `30_…` A8.3 | ☐ |
-| D126 | XMAS scan triggers Snort (Meas) | 0.4 | `30_…` A8.4 | ☐ |
+| D126 | FIN scan triggers Snort (Meas — Lyon row says XMAS, MA2 PDF page 10 says FIN) | 0.4 | `30_…` A8.4 | ☐ |
 | **A8 subtotal** | | **1.7** | | |
 
 ### Criterion A grand total
@@ -198,52 +202,46 @@ When the chief releases the official **Day 2 deliverables doc** and the **ASEAN 
 
 ---
 
-## Criterion B — Day 2 (Max 25) — Security Hardening: SOC + IR + Forensics + AppSec
+## Criterion B — Day 2 (Max 25) — MA2 Security Hardening (per MA2 PDF)
 
-> 🎯 Per chief Marlon's confirmation: Day 2 = **Security Hardening from scratch**, named tools = **Security Onion** + **OpenVPN**.
-> The marking-scheme title for this criterion (*"Cyber Security Incident Response, Digital Forensics, Application Security"*) matches a SOC-build module, not a CTF.
-> The HO-/CM- flag rows are **Lyon-2024 leftovers** — they will likely be replaced by Day 2 build/IR/forensics aspects when the official Day 2 doc lands.
+> ✅ **MA2 PDF IS the Day 2 module** (chief confirmed). The Lyon-leftover row names (HO Flags, Casual Malware Flags) in the spreadsheet don't match the actual MA2 deliverables, but K-totals still sum to 25. The chief will likely rebalance row names before competition; meanwhile the MA2 PDF is the source of truth for what to do.
 
-| Lyon-leftover row | K placeholder | Likely Day 2 deliverable | Solved by following |
+| Lyon-leftover row | K placeholder | Actual MA2 deliverable | Solved by following |
 |---|---|---|---|
-| HO-01 to HO-07 (with H1/H2 bonuses) | ~13.0 | Security Onion deployment + Wazuh onboarding (Linux + Windows) + log-source forwarding | `24_…` Phase 1; `07_Setup_SecurityOnion.md` |
-| CM-01 to CM-08 (with H1/H2 bonuses) | ~12.0 | OpenVPN server install + cert chain + IR investigation + forensic findings + AppSec hardening | `24_…` Phases 2–5 |
+| HO-01 to HO-07 (with H1/H2 bonuses) | ~13.0 | pfSense rules + OpenVPN + Snort + AD GPOs (lockout, certenroll, autolock, restrict CP, disable add/remove) | `20_…`, `22_…` |
+| CM-01 to CM-08 (with H1/H2 bonuses) | ~12.0 | LinSRV1 hardening + PKI completion + share/audit + functional verification from clients | `21_…`, `23_…`, `30_…` |
 | **Criterion B total (paper)** | **25.0** | | |
 
-Track each step solved as: deliverable / outcome / time / observations.
+Track each MA2 deliverable as: ☐ done / ☐ verified-from-client / time / notes.
 
 ---
 
-## Criterion C — Day 3 (Max 25) — CTF: Juice Shop ★1–★4 and/or 1st VulnHub VM
+## Criterion C+D — Day 3 (Max 50) — CTF: VulnHub random pick + Juice Shop
 
-| Lyon-leftover row | K placeholder | Likely target | Solved by following |
+> Per chief: **Day 3 is CTF only**. Random-pick from VulnHub, plus Juice Shop. The marking scheme has 50 marks split across Crit C (25) + Crit D (25), but functionally it's all one CTF day.
+
+| Lyon-leftover row | K placeholder | Actual likely target | Solved by following |
 |---|---|---|---|
-| ODD Flag 01–12 (+ H1/H2) | ~17.5 | Mid VulnHub VM (e.g. DC-1, DC-2, Mr. Robot) — flags map to user shell + root + per-stage flags | `51_…` boot-to-root, `52_…` Walkthroughs 2,3,4 |
-| Cache-Cache Flag 01–03 | ~7.5 | Juice Shop ★1–★4 (login admin, reset Jim, UNION SQLi, JWT, vulnerable lib) | `50_…`, `51_…` Section X |
-| **Criterion C total** | **25.0** | | |
+| ODD Flag 01–12 (Crit C, ~17.5 K) | 17.5 | Mid VulnHub VM (DC-1, DC-2, Mr. Robot, Basic Pentesting 1) — user shell + root + per-stage flags | `51_…` boot-to-root, `52_…` Walkthroughs 2–4 |
+| Cache-Cache Flag 01–03 (Crit C, ~7.5 K) | 7.5 | Juice Shop ★1–★4 (login admin, reset Jim, UNION SQLi, JWT, vulnerable lib) | `50_…`, `51_…` Section X |
+| CS-01 to CS-15 (Crit D, 25 K) | 25.0 | Harder VulnHub (DC-3+, Kioptrix, Sunset) OR Juice Shop ★5–★6 (Forged JWT, SSRF, XXE, Premium Paywall) | `52_…` advanced walkthroughs |
+| **Crit C+D total** | **50.0** | | |
 
----
-
-## Criterion D — Day 4 (Max 25) — Harder VulnHub VM and/or Juice Shop ★5–★6
-
-| Lyon-leftover row | K placeholder | Likely target | Solved by following |
-|---|---|---|---|
-| CS-01 to CS-15 + hint bonuses | 25.0 | Harder VulnHub (DC-3+, Kioptrix Level 1, Sunset series) + Juice Shop ★5–★6 (Forged JWT, SSRF, XXE, Premium Paywall) | `52_…` Walkthroughs 5,6 + Juice Shop hard section |
-| **Criterion D total** | **25.0** | | |
-
-> When chief releases the official Day 2 deliverables doc + flag→target mapping, replace the placeholder columns above with the actual rows.
+> When chief releases the actual ASEAN flag → target mapping (closer to competition day), replace the placeholder rows above with the real flag IDs.
 
 ---
 
 ## Grand total
 
-| Criterion | Max | Your score |
-|---|---|---|
-| A — Day 1 | 25 | __ |
-| B — Day 2 | 25 | __ |
-| C — Day 3 | 25 | __ |
-| D — Day 4 | 25 | __ |
-| **Total** | **100** | __ |
+| Criterion | Day | Max | Your score |
+|---|---|---|---|
+| A — MA1 (CMS pentest) + MA2 (Hardening) | 1 + 2 | 25 | __ |
+| B — MA2 deliverables (overlapping w/ A2–A8) | 2 | 25 | __ |
+| C — Day 3 CTF | 3 | 25 | __ |
+| D — Day 3 CTF advanced | 3 | 25 | __ |
+| **Total** | | **100** | __ |
+
+> ⚠️ The marking scheme overlaps Crit A and Crit B in covering MA2 work (since both reference MA2 deliverables). The chief will likely rebalance these. Aim to complete every MA2 deliverable cleanly — it scores under whichever criterion the rebalanced scheme uses.
 
 ---
 
@@ -251,15 +249,11 @@ Track each step solved as: deliverable / outcome / time / observations.
 
 | Defect in marking scheme | Mitigation |
 |---|---|
-| G119 says banner = "WorldSkills Lyon" — **wrong** | Type "WorldSkills ASEAN Manila" (per project) |
-| H120 says "france.jpg" — **wrong** | Use "manila.jpg" (per project) |
-| 4 missing aspects (domain pwd 8-char, FGPP 10-char, control GPO, registry GPO) | Implement them anyway — covered in `22_…` |
-| Day 4 exists in marking scheme but not in test plan | Practice for 4 days; if 3, you'll be over-prepared |
-| Day 2 = Security Hardening (per chief), not CTF | Build SOC + OpenVPN practice rig — see `24_…` and `07_…` |
-| All B/C/D flag names are Lyon-leftover | Confirmed by chief: Day 2 = SOC build, Days 3–4 CTF = **Juice Shop + VulnHub random pick** |
-| Chief has not yet released the Day 2 deliverables doc (no MA3-equivalent) | Build everything in `24_…` based on Marlon's named tools; verify when doc lands |
-| Chief has not yet released ASEAN flag → challenge mapping | Track every challenge you solve — when mapping drops, fill in placeholders above |
-| Day 2 may need internet during the build (Marlon mentioned it) | Confirmed reading: tools are **pre-staged on competition VMs**; internet only needed during organisers' prep AND during your at-home practice. No internet on competition day. |
+| Day-of-Marking column has 4 days; actual competition is 3 days | Practice covers all 3 days; the Day 4 row is Lyon-leftover |
+| All B/C/D flag names (HO/CM/ODD/CC/CS) are Lyon-leftover | Per MA1+MA2 PDFs and chief confirmation: Day 1 = MA1 pentest, Day 2 = MA2 hardening, Day 3 = CTF |
+| Marking scheme rows haven't been re-aligned to MA1/MA2 PDFs yet | The chief will likely publish a revised marking scheme before competition. K-totals (25 per criterion, 100 total) still hold. |
+| Older docx version of marking scheme had banner = "WorldSkills Lyon" | The MA2 PDF says **"WorldSkills ASEAN Manila"** — type this exactly per `22_…` Step 3. |
+| MA1 PDF tasks (Information Gathering / CMS Vuln / System Weaknesses / Report) don't map 1:1 to the 4 Lyon Crit-A1 row names | Aim for completing all 4 PDF tasks correctly + a clean 150-word report; total K stays 6.0 |
 
 ---
 

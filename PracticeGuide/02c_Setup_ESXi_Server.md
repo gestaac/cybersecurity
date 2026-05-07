@@ -23,7 +23,7 @@ ESXi 8 is **picky about hardware**. Before burning time on a failed install, ver
 ### A.3 Storage
 - **Minimum 32 GB drive** for ESXi system + scratch.
 - Datastore for VMs goes on remaining space.
-- **Your 240 GB SSD reality:** ESXi takes ~32 GB → ~200 GB datastore. Workable for MA2 alone with thin-prov; **won't fit Day 2 Security Onion** (needs 300 GB nominal). See `01_…` Section 0 for the per-VM disk math.
+- **Your 240 GB SSD reality:** ESXi takes ~32 GB → ~200 GB datastore. Workable for MA2 alone with thin-prov. See `01_…` Section 0 for the per-VM disk math.
 
 ### A.4 NIC — the most common gotcha
 ESXi 8's built-in driver list **dropped many cheap consumer NICs**, including:
@@ -202,9 +202,9 @@ Follow `02_…` **Section B steps 1–5** to create:
 - vSwitch + port group `PG-Servers`
 - vSwitch + port group `PG-MA1-LAN`
 
-**Important — promiscuous mode for Day 2 Security Onion:**
-For each port group that Security Onion will monitor (typically `PG-LAN`):
-- *Edit settings → Security* → set **Promiscuous mode = Accept**.
+**Promiscuous mode (optional):** if you ever want to capture traffic with Wireshark from a VM that needs to see other VMs' packets:
+- *Port Group → Edit settings → Security* → set **Promiscuous mode = Accept**.
+- Not required for the MA1/MA2/CTF deliverables, but useful for troubleshooting.
 
 ---
 
@@ -259,7 +259,7 @@ Before declaring the ESXi server "ready", confirm all:
 - [ ] PC1 browser opens `https://192.168.1.10/ui` and you can log in as `root`
 - [ ] *Storage → Datastores* shows at least one datastore with ~200 GB free
 - [ ] *Networking → Port groups* shows the 5 port groups (PG-Internet, PG-LAN, PG-DMZ, PG-Servers, PG-MA1-LAN)
-- [ ] PG-LAN's promiscuous mode is **Accept** (for future Security Onion use)
+- [ ] (Optional) Promiscuous mode set to **Accept** on any port group you'll capture from with Wireshark
 - [ ] You took a note of the root password in the team's password file
 - [ ] You set "Power on after AC loss" in BIOS so the server auto-recovers
 - [ ] Time on ESXi is correct: *Manage → System → Time & date* — set NTP server `pool.ntp.org` and sync
