@@ -172,7 +172,7 @@ At the actual competition the organizers handle the integration; you only need t
 | 0:00–0:15 | Both teammates open Juice Shop side-by-side. Find score-board. |
 | 0:15–1:30 | Solve every ★1 (≈ 8 challenges). |
 | 1:30–3:00 | Solve every ★2 (≈ 12 challenges). |
-| 3:00–4:30 | Start ★3 — see `41_Day3_CTF_Red.md`. |
+| 3:00–4:30 | Start ★3 — see `51_Day3_VulnHub_BootToRoot.md`. |
 | 4:30–5:30 | Continue, lean on ebook hints. |
 | 5:30–6:00 | Documentation + report PDF. |
 

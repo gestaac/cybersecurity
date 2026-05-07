@@ -123,7 +123,7 @@ All four should reply in under 50 ms. If any fail:
 
 MA2 needs four isolated networks: **Internet**, **LAN**, **DMZ**, **Servers**. We model each as an **ESXi port group** on its own **vSwitch** (no physical uplinks needed for inter-VM traffic).
 
-### Steps in the ESXi web UI (`https://192.168.10.10/ui`)
+### Steps in the ESXi web UI (`https://192.168.1.10/ui`)
 
 #### Step 1 — Create vSwitch1 (Internet) + port group
 **Why:** isolates the "fake Internet" + Client3 from the rest.

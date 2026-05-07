@@ -177,9 +177,14 @@ For each one:
 2. Select *Host-only* (not Bridged, not NAT — we want isolation).
 3. Set *Subnet IP* + *Subnet mask* per the table above.
 4. **UNTICK** *"Use local DHCP service"* — we want the lab itself to control DHCP (pfSense will be DHCP for MA2 LAN, ISP for MA2 Internet, etc.). Exception: tick DHCP only for VMnet14 (MA1 LAN) so MA1 clients can boot before AD is configured.
-5. UNTICK *"Connect a host virtual adapter to this network"* (we don't want Windows to have an IP on these subnets — the labs are isolated).
+5. **TICK** *"Connect a host virtual adapter to this network"* — yes, leave it ticked. ⚠️ **This is required** so the VMnet appears in the VM Settings → Network Adapter → Custom dropdown. (If unticked, VMware Workstation hides the VMnet from the dropdown and you can't assign VMs to it.) The downside is your Windows host gets an IP on each lab subnet — fine for solo practice; it actually helps with troubleshooting (you can `ping` lab VMs directly from Windows).
 
 Apply when done.
+
+> 🔧 **If you already created the VMnets with the host adapter UNticked** and now the dropdown is empty when you go to VM Settings → Network Adapter:
+> 1. Go back to *Edit → Virtual Network Editor → Change Settings* (admin).
+> 2. For each VMnet (10, 11, 12, 13, 14), click it → **tick** *"Connect a host virtual adapter to this network"* → Apply.
+> 3. Now reopen VM Settings → the VMnets appear in the dropdown.
 
 > 💡 You can keep the default **VMnet8 (NAT)** as is — that's the network you'll use for any VM that needs internet (Kali during package installs, the practice host running Juice Shop's `npm start`).
 

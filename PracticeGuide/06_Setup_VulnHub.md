@@ -226,4 +226,4 @@ For competition day, copy these onto your USB:
 
 ---
 
-When done with this file → continue to **`41_Day3_CTF_Red.md`** for the boot-to-root methodology and **`42_Day4_CTF_Blue.md`** for VM-by-VM walkthroughs.
+When done with this file → continue to **`51_Day3_VulnHub_BootToRoot.md`** for the boot-to-root methodology and **`52_Day4_CTF_Hard.md`** for VM-by-VM walkthroughs.

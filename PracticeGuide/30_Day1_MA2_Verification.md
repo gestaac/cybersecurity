@@ -192,4 +192,4 @@ nslookup www.manila.com
 
 If Day 1 totals (A1+A2+A3+A4+A5+A6+A7+A8) are tracked correctly you should be on pace for **23–25 / 25 of Criterion A**.
 
-Next file: **`40_Day2_CTF_Playbook.md`**.
+Next file: **`24_Day2_SecurityHardening.md`** (the Day 2 build module). CTF practice from `50_Day3_CTF_Playbook.md` onward.

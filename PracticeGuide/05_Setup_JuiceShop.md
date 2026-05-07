@@ -233,4 +233,4 @@ USB contents:
 
 ---
 
-Next: jump to **`40_Day2_CTF_Playbook.md`** — methodology + walkthrough of every ★1 and ★2 challenge.
+Next: jump to **`50_Day3_CTF_Playbook.md`** — methodology + walkthrough of every ★1 and ★2 challenge.
