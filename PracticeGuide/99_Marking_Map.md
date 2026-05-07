@@ -6,6 +6,72 @@ Cross-reference of every aspect in `WSA2025_54_Cyber_Security_marking_scheme_Rev
 
 ---
 
+## Day of Marking — what the spreadsheet says vs reality
+
+Verified directly from column **C** (Day of Marking) of the spreadsheet:
+
+| Sub-criterion ID | Title in spreadsheet | Day column |
+|---|---|---|
+| A1 | Morning of Day 1 — security assessments | **1** |
+| A2 | Firewall | **1** |
+| A3 | LINSRV1 | **1** |
+| A4 | WinSRV1 (AD) | **1** |
+| A5 | WINSRV3 | **1** |
+| A6 | Client1 | **1** |
+| A7 | Client2 (Internal) | **1** |
+| A8 | Client3 (External) | **1** |
+| B1 | HO Flags | **2** |
+| B2 | Casual Malware Flags | **2** |
+| C1 | ODD Flags | **3** |
+| C2 | From Cache Cache portion of CTF | **3** |
+| D1 | Blueday Flags | **4** |
+
+### What this means literally
+
+The **spreadsheet** marks 4 competition days with the following day-by-day pattern:
+- Day 1: Criterion A (MA1 + MA2 work)
+- Day 2: Criterion B — "HO Flags" + "Casual Malware Flags" (CTF-style)
+- Day 3: Criterion C — "ODD Flags" + "Cache-Cache Flags" (CTF-style)
+- Day 4: Criterion D — "Blueday Flags" (CTF-style)
+
+### ⚠️ But the spreadsheet contradicts what the chief told us
+
+Per chief Marlon's confirmation:
+- **Day 2 = "Security Hardening from scratch"** with **Security Onion + OpenVPN** as named tools.
+- **Days 3–4 CTF** uses **OWASP Juice Shop + random-pick VulnHub VMs**.
+
+Compare:
+
+| Day | Marking scheme says (literal) | Reality per chief Marlon | Title of criterion (in spreadsheet) |
+|---|---|---|---|
+| **1** | MA1 + MA2 (Crit A, 25 marks) | ✅ Same | "Enterprise Infrastructure Security" |
+| **2** | "HO Flags" + "CM Flags" CTF (Crit B, 25 marks) | ⚠️ Lyon-leftover row names. Reality = **Security Hardening (SOC + OpenVPN + IR + forensics + AppSec)** | "Cyber Security Incident Response, Digital Forensics, Application Security" — title matches reality, **not** the row names |
+| **3** | "ODD Flags" + "Cache-Cache" Red CTF (Crit C, 25 marks) | Likely first CTF day — Juice Shop + VulnHub | "Red CTF" |
+| **4** | "Blueday Flags" / CS Flags (Crit D, 25 marks) | Likely second CTF day — harder VulnHub + Juice Shop ★5–★6 | "Blue CTF" |
+
+### Why the discrepancy exists
+
+The spreadsheet was **copy-pasted from the Lyon WSC 2024 Cyber Security marking scheme** with only partial localisation:
+- Criterion **titles** were updated for ASEAN.
+- Criterion **B/C/D row names** (HO/CM/ODD/CC/CS prefixes) were NOT updated — they're Lyon challenge names.
+- The **Day-of-Marking column** stayed valid (1/2/3/4).
+- The **K-values stayed valid** (sum to 25 per criterion).
+
+So the **DAY numbers and TITLES are reliable**; the **row names are not**.
+
+### How our guide aligns
+
+| Day | What the guide covers | File(s) |
+|---|---|---|
+| 1 | MA1 + MA2 walkthroughs (matches spreadsheet exactly) | `10_…`, `20_…` to `30_…` |
+| 2 | Security Hardening (SOC + OpenVPN + IR + forensics + AppSec) — matches Crit B title, not row names | `24_Day2_SecurityHardening.md`, `07_Setup_SecurityOnion.md` |
+| 3 | CTF: Juice Shop ★1–★4 + first VulnHub VM (boot-to-root) | `50_…`, `51_…` |
+| 4 | CTF: harder VulnHub + Juice Shop ★5–★6 | `52_…` |
+
+When the chief releases the official **Day 2 deliverables doc** and the **ASEAN flag → target mapping** for Days 3–4, we replace the placeholder rows in this file with real aspect-by-aspect K-values.
+
+---
+
 ## Criterion A — Day 1 (Max 25)
 
 ### A1 — Morning of Day 1, Security Assessments

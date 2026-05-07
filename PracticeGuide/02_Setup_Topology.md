@@ -304,3 +304,125 @@ Your current plan = **bare minimum**, which is fine for everything below.
 - [ ] You understand which port group each VM should sit on (Section C)
 
 If yes → next file: `03_Setup_VMs_MA1.md`.
+
+---
+
+## G. What's on each box at competition (reference)
+
+Consolidated picture of what's pre-installed where on competition day. Use as reference; informs what you bring on USB and what to expect on each VM.
+
+### G.1 Physical PC1 + PC2 (your team workstations)
+
+Mostly **VM viewers + documentation machines**. Minimal security tooling on the host OS itself.
+
+| Layer | What |
+|---|---|
+| OS | Windows 10/11 |
+| Hypervisor client | VMware Workstation Pro 17 (to view VMs on the ESXi server) |
+| Browser | Chrome + Firefox (to reach ESXi web UI, pfSense web UI, Juice Shop) |
+| Remote access | PuTTY, WinSCP, OpenSSH client (built in) |
+| Documentation | LibreOffice / MS Office, Greenshot, Notepad++, Print-to-PDF |
+| Auth credentials | `Competitor0 / CharterDressing` per MA1 line 20 |
+
+> The login `Competitor0` is on the physical workstation. Inside the VMs, separate credentials apply (e.g. `MANILA\Anorbert / P@ssw0rd`).
+
+### G.2 Physical ESXi server (the 3rd box)
+
+Just one thing on it: **VMware ESXi 8.x**. ESXi is the bare-metal hypervisor — all real work happens inside the VMs it hosts.
+
+| Layer | What |
+|---|---|
+| OS | VMware ESXi 8 (no Linux/Windows underneath) |
+| Auth | `pmuser / Paul Bocuse` afternoon (MA2 line 38) and `amuser / Mt Blanc` morning (MA1 line 60) |
+
+### G.3 VMs hosted on the ESXi server (the actual practice surface)
+
+Pre-built and pre-configured by the organisers — already on the ESXi datastore when you arrive.
+
+#### G.3.1 Morning — MA1 set (assess Apache vulnerabilities)
+| VM | Role | Pre-installed inside |
+|---|---|---|
+| **DC.grimshay.local** | Domain controller, DNS for grimshay.local | AD, DNS |
+| **www.grimshay.ca** | The deliberately weak Apache web server (your assessment target) | Apache + LDAP auth misconfigured (the flaws you're hunting) |
+| **AMClient1** | Win10 LAN client | Chrome, PuTTY, Wireshark *(MA1 line 50)* |
+| **AMClient2** | Win10 LAN client | Same |
+
+#### G.3.2 Afternoon — MA2 set (build/harden manila.com)
+| VM | Role | Pre-installed inside |
+|---|---|---|
+| **ISP** | Fake Internet, DNS, DHCP, hosts test sites | dnsmasq + Apache with self-signed certs |
+| **pfSense** | Firewall, base install only — you configure it | pfSense 2.7.2 base + **OpenVPN package pre-downloaded** + **Snort package pre-downloaded** *(MA2 lines 178, 181)* |
+| **WINSRV1** | DC for manila.com, file server | Win Server 2022 + AD + DNS + DHCP, **`googleChromeEnterpriseBundle64.zip` pre-staged in Documents** *(MA2 line 204)*, plus `manila.jpg` placeholder |
+| **WINSRV3** | Issuing CA (half-built — you finish it) | Win Server 2022 + AD CS subordinate role partially configured |
+| **WINSRV4** | Offline Root CA (already configured) | Win Server 2022 + AD CS standalone root |
+| **LINSRV1** | Apache web server in DMZ, you harden it | CentOS Stream 9 + httpd + base packages, deliberately un-hardened |
+| **Client1** | LAN client, DHCP | Win 10 + Chrome, PuTTY, Wireshark |
+| **Client2** | LAN client, DHCP | Same |
+| **Client3** | External client, DHCP from ISP | Win 10 + Chrome, PuTTY, Wireshark, **Nmap** *(MA2 line 235)*, OpenVPN Connect |
+
+#### G.3.3 Day 2 — Security Hardening (per chief Marlon, speculative)
+Official Day 2 doc not released yet. Likely:
+
+| VM | Role | Pre-installed inside |
+|---|---|---|
+| **Security Onion** | SOC platform | Either pre-installed Security Onion 2.4 OR a fresh CentOS/Ubuntu with the SO ISO pre-staged on the datastore for you to install |
+| **OpenVPN service** | Standalone OpenVPN server | Either pre-installed CentOS with OpenVPN pre-staged, OR fresh build using locally cached RPMs |
+| **Possibly: monitored hosts** | Receivers of Wazuh agents | Day 1's LinSRV1 + WINSRV1 may carry over from morning |
+
+#### G.3.4 Days 3–4 — CTF (random-pick from VulnHub + Juice Shop)
+| VM | Role |
+|---|---|
+| **Kali Linux** | Your attacker box — pre-loaded with Burp Community, sqlmap, nmap, gobuster, ffuf, jwt_tool, hashcat, john, Volatility 3, Ghidra, etc. |
+| **OWASP Juice Shop** | Web CTF target (confirmed by Marlon) — likely as a Node.js install on a server VM |
+| **1–N VulnHub VMs** | Boot-to-root targets, randomly picked by chief from VulnHub catalogue |
+| **CTFD server** | Scoreboard (separate from team ESXi — runs on competition LAN per Infrastructure-List, managed by organisers) |
+
+### G.4 What you BRING on USB
+
+Per CTF rules: **no internet at the venue**. Bring everything pre-downloaded:
+
+| Category | Items |
+|---|---|
+| Reference docs | Pwning OWASP Juice Shop PDF, HackTricks PDF, GTFOBins offline mirror, OWASP Top 10 PDF |
+| Wordlists | rockyou.txt, SecLists, PayloadsAllTheThings |
+| Privesc tools | LinPEAS, WinPEAS, LinEnum.sh |
+| Web tools | Burp Suite Community installer (in case Kali doesn't have it), CyberChef offline build |
+| Day-2 specific | Wazuh agent RPM (Linux) + MSI (Windows), Security Onion 2.4 ISO (backup), NetworkMiner |
+| Networking tools | Nmap installer (Windows), Wireshark installer |
+| Documentation | LibreOffice installer, Greenshot installer |
+| Backup | Full copy of your `PracticeGuide/` folder so you have offline reference |
+
+### G.5 Network connections at competition (from Infrastructure-List)
+
+Each PC has 2 NICs:
+- **NIC #1** → team switch → reaches the **team's ESXi server** (where all team VMs live)
+- **NIC #2** → competition LAN switch → reaches the **shared CTFD server + TV scoreboard** (managed by organisers)
+
+Each team has:
+- Its own **eSXi server** (the 3rd box)
+- Its own **unmanaged switch** for team-internal traffic
+- Connection to the **competition LAN** for scoring
+
+The ESXi server is **not on the competition LAN** — it's behind the team switch. CTFD only sees scoring traffic from PC1/PC2's NIC #2.
+
+### G.6 What is NOT pre-installed (you must do during competition)
+
+These are the actual deliverables that earn you marks:
+
+| Day | Action |
+|---|---|
+| MA1 | Write the executive summary + 2 vulnerability reports (no install — just analysis + writing) |
+| MA2 | Configure pfSense rules, OpenVPN, Snort; harden LinSRV1; create AD GPOs/share/audit; finish PKI on WINSRV3 |
+| Day 2 | Build/configure Security Onion, deploy Wazuh agents, configure OpenVPN service, investigate alerts |
+| Days 3–4 | Solve the challenges (Juice Shop + VulnHub VMs) |
+
+### G.7 Open unknowns (will be resolved when chief releases more docs)
+
+| Unknown | Impact |
+|---|---|
+| Whether Day 2 VMs ship pre-installed with SO, or fresh OS for you to install SO from local ISO | Both cases covered in `24_Day2_SecurityHardening.md` |
+| Which specific VulnHub VMs the chief picks | We practise on the top-8 most likely (per `06_…` Part F) |
+| Whether CTFD is on a single shared server or per-team | Doesn't affect prep — you submit flags to whatever URL is given |
+| Whether OpenVPN Day 2 is a separate VM or just a service on an existing one | `24_…` covers building from scratch, which works either way |
+
+If the chief releases the Day 2 official doc, several of these unknowns disappear.

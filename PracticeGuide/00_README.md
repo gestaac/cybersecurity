@@ -45,6 +45,8 @@ Every step in this guide tells you:
 
 > ⚠️ The official Test Project Development plan only lists 3 competition days. The marking scheme has 4 marking days. Treat this as 4 days for safety; if the schedule is later confirmed as 3, Days 3 and 4 will be compressed into Days 2 and 3.
 
+> 📊 **For the verified Day-of-Marking column** (extracted directly from the spreadsheet) and the explanation of how reality differs from the literal row names, see **`99_Marking_Map.md`** → top section *"Day of Marking — what the spreadsheet says vs reality"*.
+
 ---
 
 ## Time budget per Day 1 file (rehearse against the clock)
