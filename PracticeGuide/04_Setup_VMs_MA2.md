@@ -122,42 +122,129 @@ For now, the pfSense base install is **ready to be configured by competitors** (
 ### Step 3.1 — Install Win Server 2022
 Same approach as MA1 DC. Static IP `192.168.2.10/24`, gateway `192.168.2.254`, DNS `127.0.0.1`. Rename to `WINSRV1`.
 
-### Step 3.2 — Promote to DC for `manila.com`
-```powershell
-Install-WindowsFeature AD-Domain-Services,DNS,DHCP -IncludeManagementTools
-Install-ADDSForest -DomainName "manila.com" -DomainNetbiosName "MANILA" `
-  -SafeModeAdministratorPassword (ConvertTo-SecureString "P@ssw0rd" -AsPlainText -Force) `
-  -InstallDns -Force
-```
-After reboot:
-```powershell
-# Create groups + users used in MA2
-"customer service","Graphics","IT","executive","accounting","Manila","VPN Users" | % {
-    New-ADGroup -Name $_ -GroupScope Global -GroupCategory Security
-}
+### Step 3.2 — Promote to DC for `manila.com` (GUI)
 
-@("Anorbert","mratt","C1","C2","gfxguy","csguy","itguy","accuser","execuser","vpnuser") | ForEach-Object {
-    New-ADUser -Name $_ -SamAccountName $_ `
-        -AccountPassword (ConvertTo-SecureString "P@ssw0rd" -AsPlainText -Force) `
-        -Enabled $true -ChangePasswordAtLogon $false
-}
+Same pattern as MA1 (`03_…` Step 1.3). Quick recap of the click path:
 
-Add-ADGroupMember "Graphics"          gfxguy
-Add-ADGroupMember "customer service"  csguy
-Add-ADGroupMember "IT"                itguy
-Add-ADGroupMember "accounting"        accuser
-Add-ADGroupMember "executive"         execuser
-Add-ADGroupMember "Manila"            mratt,Anorbert
-Add-ADGroupMember "VPN Users"         vpnuser
-```
+#### 3.2.1 — Install AD DS + DNS + DHCP roles
+1. *Server Manager → Manage → Add Roles and Features*.
+2. Wizard: Next → Next → leave server `WINSRV1` selected → Next.
+3. *Server Roles* tick:
+   - ☑ **Active Directory Domain Services** (add features when prompted).
+   - ☑ **DNS Server** (add features when prompted; ignore the "static IP recommended" warning — we already set one).
+   - ☑ **DHCP Server** (add features when prompted).
+4. Next → Next → leave defaults on info pages → tick *Restart automatically* → **Install**.
+5. Wait ~5 min for installation.
 
-### Step 3.3 — DNS records
-```powershell
-Add-DnsServerPrimaryZone -Name "manila.com" -ReplicationScope Forest
-Add-DnsServerResourceRecordA -ZoneName manila.com -Name "www"      -IPv4Address 192.168.1.10  # LinSRV1 site
-Add-DnsServerResourceRecordA -ZoneName manila.com -Name "webtest"  -IPv4Address 192.168.2.30  # WinSRV3 IIS
-Add-DnsServerResourceRecordA -ZoneName manila.com -Name "w3"       -IPv4Address 192.168.2.30  # for chrome homepage
-```
+#### 3.2.2 — Promote to Domain Controller
+1. Server Manager top-right yellow flag → **Promote this server to a domain controller**.
+2. *Deployment Configuration* → **Add a new forest** → Root domain name `manila.com` → Next.
+3. *Domain Controller Options*:
+   - DSRM password: `P@ssw0rd` (confirm).
+   - Tick DNS server + Global Catalog.
+   - Next.
+4. *DNS Options* → ignore the delegation warning → Next.
+5. *Additional Options* → NetBIOS name `MANILA` → Next.
+6. *Paths* → defaults → Next.
+7. *Review* → Next.
+8. *Prerequisites* → Install. **VM reboots automatically.**
+
+After reboot, log in as `MANILA\Administrator / P@ssw0rd`.
+
+#### 3.2.3 — Create the AD groups
+**Tools:** *Server Manager → Tools → Active Directory Users and Computers*.
+
+Right-click the **Users** container → **New → Group**. For each of the names below, create the group with scope **Global**, type **Security**:
+
+- `customer service`
+- `Graphics`
+- `IT`
+- `executive`
+- `accounting`
+- `Manila`
+- `VPN Users`
+
+(7 groups total. Takes ~3 min clicking.)
+
+#### 3.2.4 — Create the AD users
+Right-click **Users** → **New → User**. For each of:
+
+- Anorbert
+- mratt
+- C1
+- C2
+- gfxguy
+- csguy
+- itguy
+- accuser
+- execuser
+- vpnuser
+
+Set:
+- *First name + User logon name:* same as the username (lowercase).
+- Password: `P@ssw0rd`.
+- UNTICK *"User must change password at next logon"*.
+- TICK *"Password never expires"*.
+
+(10 users total.)
+
+#### 3.2.5 — Add users to groups
+Open each group, right-click → **Properties → Members → Add**.
+
+| Group | Members |
+|---|---|
+| Graphics | gfxguy |
+| customer service | csguy |
+| IT | itguy |
+| accounting | accuser |
+| executive | execuser |
+| Manila | mratt, Anorbert |
+| VPN Users | vpnuser |
+
+> *Quick PowerShell alternative for all of Step 3.2:*
+> ```powershell
+> Install-WindowsFeature AD-Domain-Services,DNS,DHCP -IncludeManagementTools
+> Install-ADDSForest -DomainName "manila.com" -DomainNetbiosName "MANILA" `
+>   -SafeModeAdministratorPassword (ConvertTo-SecureString "P@ssw0rd" -AsPlainText -Force) `
+>   -InstallDns -Force
+> # ... after reboot:
+> "customer service","Graphics","IT","executive","accounting","Manila","VPN Users" |
+>   % { New-ADGroup -Name $_ -GroupScope Global -GroupCategory Security }
+> @("Anorbert","mratt","C1","C2","gfxguy","csguy","itguy","accuser","execuser","vpnuser") |
+>   % { New-ADUser -Name $_ -SamAccountName $_ -AccountPassword (ConvertTo-SecureString "P@ssw0rd" -AsPlainText -Force) -Enabled $true -ChangePasswordAtLogon $false }
+> Add-ADGroupMember "Graphics" gfxguy
+> Add-ADGroupMember "customer service" csguy
+> Add-ADGroupMember "IT" itguy
+> Add-ADGroupMember "accounting" accuser
+> Add-ADGroupMember "executive" execuser
+> Add-ADGroupMember "Manila" mratt,Anorbert
+> Add-ADGroupMember "VPN Users" vpnuser
+> ```
+
+### Step 3.3 — DNS records (GUI)
+**Tools:** *Server Manager → Tools → DNS*.
+
+Expand **DC** (or **WINSRV1**) → **Forward Lookup Zones**. The zone `manila.com` already exists from the promotion.
+
+Right-click **manila.com** → **New Host (A or AAAA)…**. Add three records (one at a time):
+
+| Name | IP | What it points to |
+|---|---|---|
+| `www` | `192.168.1.10` | LinSRV1 in DMZ |
+| `webtest` | `192.168.2.30` | WINSRV3 IIS |
+| `w3` | `192.168.2.30` | Chrome homepage GPO target |
+
+For each: type the Name, type the IP, click **Add Host** → OK → Done.
+
+**Verify:** double-click `manila.com` → see `www`, `webtest`, `w3` each with type *Host (A)*.
+
+> *Quick PowerShell alternative:*
+> ```powershell
+> Add-DnsServerPrimaryZone -Name "manila.com" -ReplicationScope Forest  # only if zone doesn't exist
+> Add-DnsServerResourceRecordA -ZoneName manila.com -Name "www"     -IPv4Address 192.168.1.10
+> Add-DnsServerResourceRecordA -ZoneName manila.com -Name "webtest" -IPv4Address 192.168.2.30
+> Add-DnsServerResourceRecordA -ZoneName manila.com -Name "w3"      -IPv4Address 192.168.2.30
+> ```
 
 ### Step 3.4 — Stage the Chrome Enterprise Bundle
 Copy `googleChromeEnterpriseBundle64.zip` into `C:\Users\Administrator\Documents\` on WINSRV1 (per MA2 line 204).
@@ -179,23 +266,85 @@ Set-Content C:\shares\pictures\manila.jpg "fake-jpeg-bytes"
 
 MA2 line 191: *"already configured as the subordinate (issuing) CA for the domain. Complete the following tasks…"*
 
-### Step 4.1 — Install Win Server 2022, static IP, domain-join `manila.com`
-```powershell
-Rename-Computer -NewName WINSRV3 -Restart
-# after reboot
-Add-Computer -DomainName manila.com -Credential (Get-Credential) -Restart
-```
+### Step 4.1 — Install Win Server 2022, static IP, domain-join `manila.com` (GUI)
 
-### Step 4.2 — Install AD CS as Subordinate (partially)
-```powershell
-Install-WindowsFeature AD-Certificate, ADCS-Cert-Authority, ADCS-Web-Enrollment, Web-Server -IncludeManagementTools
-Install-AdcsCertificationAuthority -CAType EnterpriseSubordinateCA `
-   -HashAlgorithm SHA256 -KeyLength 2048 `
-   -CryptoProviderName "RSA#Microsoft Software Key Storage Provider" `
-   -OutputCertRequestFile C:\winsrv3.req -Force
-```
-This creates a CSR file `C:\winsrv3.req` but the CA service stays **stopped** until the CSR is signed by WINSRV4 root.
-That's the **half-built state** competitors receive — they finish it during MA2.
+#### 4.1.1 — Install OS + set static IP
+Same as MA1 / WINSRV1 base install. Static IP `192.168.2.30/24`, gateway `192.168.2.254`, DNS `192.168.2.10` (points at WINSRV1).
+
+#### 4.1.2 — Rename to `WINSRV3`
+*Server Manager → Local Server → click computer name → Change → name `WINSRV3` → OK → restart.*
+
+#### 4.1.3 — Join the manila.com domain
+1. After reboot, log in as local Administrator.
+2. *Server Manager → Local Server → click the link "WORKGROUP"* (right of *Workgroup:*).
+3. *System Properties → Change…* button.
+4. Member of: **Domain** → type `manila.com` → OK.
+5. Prompt for credentials: `MANILA\Administrator` / `P@ssw0rd` → OK.
+6. *"Welcome to the manila.com domain"* → OK.
+7. Restart prompt → OK → Close → **Restart Now**.
+
+#### 4.1.4 — Verify after reboot
+Login screen should show *"Sign in to: MANILA"* option. Log in as `MANILA\Administrator / P@ssw0rd`.
+Server Manager → Local Server → Domain shows `manila.com`.
+
+> *Quick PowerShell alternative:*
+> ```powershell
+> Rename-Computer -NewName WINSRV3 -Restart
+> # after reboot
+> Add-Computer -DomainName manila.com -Credential (Get-Credential) -Restart
+> ```
+
+### Step 4.2 — Install AD CS as Enterprise Subordinate CA (GUI)
+
+#### 4.2.1 — Add the AD CS role
+1. *Server Manager → Manage → Add Roles and Features*.
+2. Wizard: Next → role-based → server selection (`WINSRV3`) → Next.
+3. *Server Roles* tick:
+   - ☑ **Active Directory Certificate Services** (add features when prompted).
+   - ☑ **Web Server (IIS)** under *"Web Server (IIS)"* (add features when prompted) — needed for web enrollment.
+4. *AD CS* role services screen — tick:
+   - ☑ **Certification Authority**
+   - ☑ **Certification Authority Web Enrollment**
+5. Next → Next → leave IIS defaults → Next → Install.
+6. Wait. Close when done.
+
+#### 4.2.2 — Configure AD CS
+After role install, Server Manager top-right shows yellow flag *"Configuration required for Active Directory Certificate Services at WINSRV3"*.
+
+1. Click yellow flag → **Configure Active Directory Certificate Services on the destination server**.
+2. *Credentials* → leave `MANILA\Administrator` → Next.
+3. *Role Services* → tick:
+   - ☑ Certification Authority
+   - ☑ Certification Authority Web Enrollment
+   - Next.
+4. *Setup Type* → **Enterprise CA** → Next.
+5. *CA Type* → **Subordinate CA** → Next.
+6. *Private Key* → **Create a new private key** → Next.
+7. *Cryptography for CA*:
+   - Cryptographic provider: `RSA#Microsoft Software Key Storage Provider`
+   - Key length: `2048`
+   - Hash: `SHA256`
+   - Next.
+8. *CA Name*:
+   - Common name: `manila-WINSRV3-CA` (default).
+   - Distinguished name suffix: leave default.
+   - Next.
+9. *Certificate Request*:
+   - Select **Save a certificate request to file on the target machine**.
+   - File name: `C:\winsrv3.req` → Next.
+10. *Certificate Database* → leave defaults (paths) → Next.
+11. *Confirmation* → **Configure** → wait → success → **Close**.
+
+The CA service is now **installed but not running** (waiting on the signed CSR from WINSRV4 root). That's the half-built state.
+
+> *Quick PowerShell alternative:*
+> ```powershell
+> Install-WindowsFeature AD-Certificate, ADCS-Cert-Authority, ADCS-Web-Enrollment, Web-Server -IncludeManagementTools
+> Install-AdcsCertificationAuthority -CAType EnterpriseSubordinateCA `
+>    -HashAlgorithm SHA256 -KeyLength 2048 `
+>    -CryptoProviderName "RSA#Microsoft Software Key Storage Provider" `
+>    -OutputCertRequestFile C:\winsrv3.req -Force
+> ```
 
 ### Step 4.3 — Snapshot
 > **Snapshot:** `WINSRV3-half`.

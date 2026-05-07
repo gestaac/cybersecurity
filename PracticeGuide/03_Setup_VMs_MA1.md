@@ -34,42 +34,197 @@ In MA1 you're handed a pre-built grimshay.local environment with an Apache/websi
 - DNS: 127.0.0.1
 **Verify:** `ipconfig` shows the address.
 
-### Step 1.3 — Rename + promote to DC
-**Tools:** PowerShell as Administrator.
-```powershell
-Rename-Computer -NewName "DC" -Restart
-```
-After reboot, log back in:
-```powershell
-Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
-Import-Module ADDSDeployment
-Install-ADDSForest `
-    -DomainName "grimshay.local" `
-    -DomainNetbiosName "GRIMSHAY" `
-    -SafeModeAdministratorPassword (ConvertTo-SecureString "P@ssw0rd" -AsPlainText -Force) `
-    -InstallDns -Force
-```
-**Expected:** machine reboots into the new domain.
+### Step 1.3 — Rename + promote to DC (GUI)
 
-### Step 1.4 — Create the `webusers` group + a few test users
+#### 1.3.1 — Rename the computer to `DC`
+**Tools:** Server Manager (opens automatically when you log in to Desktop Experience).
+
+1. *Server Manager → Local Server* (left sidebar).
+2. In the **PROPERTIES** section, find the row labeled *Computer name* — it'll show a random name like `WIN-XXXXXX`. Click that name.
+3. *System Properties* dialog opens → **Change…** button.
+4. *Computer name:* type `DC` → OK.
+5. Prompt: *"You must restart your computer..."* → **OK**.
+6. Back in System Properties → **Close** → click **Restart Now**.
+
+**Verify after reboot:** log back in. Server Manager → Local Server → Computer name now shows `DC`.
+
+> *Quick PowerShell alternative:* `Rename-Computer -NewName "DC" -Restart`
+
+#### 1.3.2 — Set static IP (skip if already done in Step 1.2)
+Already covered in Step 1.2 above. Confirm `ipconfig` shows `172.16.100.10` before continuing.
+
+#### 1.3.3 — Install AD Domain Services role
+**Tools:** Server Manager.
+
+1. *Server Manager → Manage* (top-right) → **Add Roles and Features**.
+2. *Before You Begin* → Next.
+3. *Installation Type* → **Role-based or feature-based installation** → Next.
+4. *Server Selection* → leave default (`DC` selected) → Next.
+5. *Server Roles* → tick ☑ **Active Directory Domain Services**.
+   - Pop-up: *"Add features that are required..."* → **Add Features** → close the pop-up → Next.
+6. *Features* → leave defaults → Next.
+7. *AD DS* (info screen) → Next.
+8. *Confirmation* → tick ☑ **Restart the destination server automatically if required** → **Install**.
+9. Wait ~3 minutes. The progress bar may say "Installation succeeded" before fully done — wait for the close button.
+
+**Verify:** Server Manager dashboard now shows **AD DS** in the left sidebar.
+
+> *Quick PowerShell alternative:* `Install-WindowsFeature AD-Domain-Services -IncludeManagementTools`
+
+#### 1.3.4 — Promote to Domain Controller
+After the role install, Server Manager shows a yellow flag at the top-right with a yellow triangle and the text *"Configuration required for Active Directory Domain Services at DC"*.
+
+1. Click that yellow flag → click **Promote this server to a domain controller**.
+2. *Deployment Configuration*:
+   - Select **Add a new forest**.
+   - Root domain name: `grimshay.local` → Next.
+3. *Domain Controller Options*:
+   - Forest functional level: Windows Server 2016 (default).
+   - Domain functional level: Windows Server 2016 (default).
+   - Tick ☑ **Domain Name System (DNS) server**.
+   - Tick ☑ **Global Catalog (GC)**.
+   - **Type the Directory Services Restore Mode (DSRM) password:** `P@ssw0rd` → confirm.
+   - Next.
+4. *DNS Options* — yellow warning *"A delegation for this DNS server cannot be created..."* — **ignore**, click Next.
+5. *Additional Options*:
+   - NetBIOS domain name: `GRIMSHAY` (default — confirm).
+   - Next.
+6. *Paths* → leave defaults (NTDS, SYSVOL, log paths) → Next.
+7. *Review Options* → review → Next.
+8. *Prerequisites Check* — should show *"All prerequisite checks passed successfully"*. Yellow warnings about cryptography are normal — ignore.
+9. **Install** → wait ~5 min → the VM will **reboot automatically** when done.
+
+**Verify after reboot:** at the login screen, you'll now see `GRIMSHAY\Administrator` instead of just `Administrator`. Log in.
+
+> *Quick PowerShell alternative:* the multi-line `Install-ADDSForest` command from earlier. GUI takes ~5 min, PowerShell ~3 min.
+
+---
+
+### Step 1.4 — Create the `webusers` group + 3 test users (GUI)
 **Why:** MA1 says only `webusers` should access the website.
-**Tools:** PowerShell as Domain Admin.
-```powershell
-New-ADGroup -Name "webusers" -GroupScope Global -GroupCategory Security
-"alice","bob","carol" | % { New-ADUser -Name $_ -AccountPassword (ConvertTo-SecureString "P@ssw0rd" -AsPlainText -Force) -Enabled $true; Add-ADGroupMember -Identity webusers -Members $_ }
-```
-**Expected:** *Active Directory Users & Computers → grimshay.local → Users* shows alice, bob, carol and a `webusers` group.
+**Tools:** Active Directory Users and Computers (ADUC).
 
-### Step 1.5 — Add DNS A record for the webserver
-```powershell
-Add-DnsServerResourceRecordA -Name "www" -ZoneName "grimshay.local" -IPv4Address "172.16.100.13"
-Add-DnsServerResourceRecordA -Name "www" -ZoneName "grimshay.ca" -IPv4Address "172.16.100.13"  # if you create the .ca zone
+#### 1.4.1 — Open ADUC
+*Server Manager → Tools → Active Directory Users and Computers* (sorted alphabetically near the top).
+
+You'll see the tree on the left:
 ```
-For grimshay.ca you'll need to add it as a primary zone:
-```powershell
-Add-DnsServerPrimaryZone -Name "grimshay.ca" -ReplicationScope "Forest"
-Add-DnsServerResourceRecordA -Name "www" -ZoneName "grimshay.ca" -IPv4Address "172.16.100.13"
+grimshay.local
+├── Builtin
+├── Computers
+├── Domain Controllers
+├── ForeignSecurityPrincipals
+├── Managed Service Accounts
+└── Users
 ```
+
+#### 1.4.2 — Create the `webusers` security group
+1. Right-click the **Users** container → **New → Group**.
+2. *Group name:* `webusers`.
+3. *Group scope:* **Global** (default).
+4. *Group type:* **Security** (default).
+5. OK.
+
+**Verify:** the right pane now lists `webusers` as type *Security Group - Global*.
+
+#### 1.4.3 — Create users alice, bob, carol
+For **each** of `alice`, `bob`, `carol`:
+1. Right-click **Users** → **New → User**.
+2. *First name:* alice (or bob, carol).
+3. *User logon name:* alice (lowercase, matches first name).
+4. Next.
+5. *Password:* `P@ssw0rd` → confirm.
+6. **UNTICK** *"User must change password at next logon"*.
+7. **TICK** *"Password never expires"*.
+8. Next → Finish.
+
+Repeat for bob, then carol.
+
+**Verify:** *Users* container now lists alice, bob, carol as *User* objects.
+
+#### 1.4.4 — Add alice, bob, carol to the `webusers` group
+**Method 1** — from the user side:
+1. Right-click **alice** → **Properties → Member Of** tab → **Add**.
+2. Type `webusers` → **Check Names** (auto-completes) → **OK** → OK.
+3. Repeat for bob and carol.
+
+**Method 2** — from the group side (faster for many users):
+1. Right-click **webusers** group → **Properties → Members** tab → **Add**.
+2. Type `alice; bob; carol` (semicolon-separated) → **Check Names** → OK → OK.
+
+**Verify:** double-click `webusers` → *Members* tab shows all three users.
+
+> *Quick PowerShell alternative:*
+> ```powershell
+> New-ADGroup -Name "webusers" -GroupScope Global -GroupCategory Security
+> "alice","bob","carol" | % {
+>   New-ADUser -Name $_ -AccountPassword (ConvertTo-SecureString "P@ssw0rd" -AsPlainText -Force) -Enabled $true
+>   Add-ADGroupMember -Identity webusers -Members $_
+> }
+> ```
+
+---
+
+### Step 1.5 — Add DNS records for the webserver (GUI)
+**Why:** AMClient1 needs to resolve `www.grimshay.ca` and `www.grimshay.local` to LinSRV1's IP `172.16.100.13`.
+**Tools:** DNS Manager.
+
+#### 1.5.1 — Open DNS Manager
+*Server Manager → Tools → DNS*.
+
+Tree on the left:
+```
+DNS
+└── DC
+    ├── Forward Lookup Zones
+    │   ├── _msdcs.grimshay.local
+    │   └── grimshay.local            ← already exists
+    ├── Reverse Lookup Zones
+    └── ...
+```
+
+#### 1.5.2 — Add A record for `www` in `grimshay.local`
+1. Expand *Forward Lookup Zones*.
+2. Right-click **grimshay.local** → **New Host (A or AAAA)…**.
+3. *Name (uses parent domain name if blank):* `www`.
+4. *IP address:* `172.16.100.13`.
+5. UNTICK *"Create associated pointer (PTR) record"* (no reverse zone yet).
+6. **Add Host** → success message → **OK** → **Done**.
+
+**Verify:** double-click `grimshay.local` → see `www` row with type *Host (A)* and data `172.16.100.13`.
+
+#### 1.5.3 — Create the `grimshay.ca` primary zone
+The website hostname is actually `www.grimshay.ca` (per MA1), so we need a separate zone for the `.ca` TLD too.
+
+1. Right-click **Forward Lookup Zones** → **New Zone…**.
+2. Wizard:
+   - *Zone Type* → **Primary zone** (leave *"Store the zone in Active Directory"* ticked).
+   - *Replication Scope* → **To all DNS servers running on domain controllers in this forest** → Next.
+   - *Zone Name* → `grimshay.ca` → Next.
+   - *Dynamic Update* → **Allow only secure dynamic updates (recommended for AD)** → Next.
+   - **Finish**.
+
+**Verify:** *Forward Lookup Zones* now shows both `grimshay.local` and `grimshay.ca`.
+
+#### 1.5.4 — Add A record for `www` in `grimshay.ca`
+1. Right-click **grimshay.ca** → **New Host (A or AAAA)…**.
+2. *Name:* `www`.
+3. *IP address:* `172.16.100.13`.
+4. **Add Host** → OK → Done.
+
+**Verify:** from a command prompt on DC:
+```cmd
+nslookup www.grimshay.ca
+nslookup www.grimshay.local
+```
+Both should return `172.16.100.13`.
+
+> *Quick PowerShell alternative:*
+> ```powershell
+> Add-DnsServerResourceRecordA -Name "www" -ZoneName "grimshay.local" -IPv4Address "172.16.100.13"
+> Add-DnsServerPrimaryZone -Name "grimshay.ca" -ReplicationScope "Forest"
+> Add-DnsServerResourceRecordA -Name "www" -ZoneName "grimshay.ca" -IPv4Address "172.16.100.13"
+> ```
 
 ### Step 1.6 — Snapshot
 ESXi → DC → *Take snapshot* → name `01-DC-clean`.
