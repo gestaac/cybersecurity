@@ -27,28 +27,72 @@ Every step in this guide tells you:
 
 ---
 
-## How to use this guide (in order)
+## The two-stage practice model (read this first)
 
-### Phase 1 — Setup (one-time, ~6 hours over 2 days)
+**At the actual competition, organisers pre-install all VMs on your ESXi server before you arrive.** Win Server 2022 is already installed on WINSRV1/3/4 with AD/CA roles configured. Kali is already at 192.168.2.2. The CMS target is already running. pfSense base is done. LinSRV1 base is done. **You don't install anything during the competition** — you just configure rules, harden services, and pentest the CMS target. That's what earns marks.
+
+**During practice, you have to do BOTH:**
+
+### Stage A — Setup (the work organisers normally do for you) — ONE TIME, ~15 hours
+You build all the VMs from scratch so your ESXi has the same starting state competitors would receive.
+
+| What you install/build | Time | File |
+|---|---|---|
+| PC1 + PC2 host tooling (VMware Workstation, browsers, PuTTY, Burp, Wireshark, Nmap, OpenVPN Connect, Node.js + Juice Shop, etc.) | 3 h | `01_Setup_Tools.md`, `08_Setup_Workstations_HostOS.md` |
+| Windows host prep (disable Hyper-V/WSL2, AV exclusions, folder layout) | 1 h | `02b_…` or `08_…` |
+| Network rig (TP-Link router + switch + ESXi port groups OR VMware VMnets) | 2 h | `02_…` (3-PC) or `02b_…` (single-PC) + `02c_…` (ESXi install) |
+| **CMS pentest target VM** (CentOS/Ubuntu + LAMP + Drupal 7 + weak `john` user + sudo NOPASSWD vim privesc) | 1 h | `03_Setup_VMs_MA1.md` Part 2 |
+| **Kali Linux VM** (import VMware image, set static IP `192.168.2.2`) | 30 min | `03_Setup_VMs_MA1.md` Part 3 |
+| **ISP VM** (CentOS + dnsmasq + Apache + 2 self-signed test sites) | 40 min | `04_Setup_VMs_MA2.md` Part 1 |
+| **pfSense** (4 NICs, base install only — leave unconfigured) | 40 min | `04_Setup_VMs_MA2.md` Part 2 |
+| **WINSRV1** (Win Server 2022 install + promote to DC manila.com + AD users from Table 3) | 90 min | `04_Setup_VMs_MA2.md` Part 3 |
+| **WINSRV3** (Win Server 2022 + AD CS Subordinate CA half-built — leave CSR pending) | 60 min | `04_Setup_VMs_MA2.md` Part 4 |
+| **WINSRV4** (Win Server 2022 + Standalone Root CA + sign WINSRV3 CSR once) | 45 min | `04_Setup_VMs_MA2.md` Part 5 |
+| **LINSRV1** (CentOS + httpd unhardened — that's the starting state) | 45 min | `04_Setup_VMs_MA2.md` Part 6 |
+| **Client1, Client2, Client3** (Win 10 + Chrome + PuTTY + Wireshark; Client3 also Nmap + OpenVPN) | 90 min | `04_Setup_VMs_MA2.md` Part 7 |
+| **Juice Shop install** (Node.js + ZIP, runs on host or Kali) | 30 min | `05_Setup_JuiceShop.md` |
+| **VulnHub VMs** (download + import the recommended 8) | 90 min | `06_Setup_VulnHub.md` |
+
+**End of Stage A: snapshot every VM.** From this point on, you can restore to "competition starting state" in 30 seconds.
+
+### Stage B — Practice the deliverables (the work that earns marks) — REPEAT 3+ TIMES
+With snapshots in place, every dry-run starts from the same clean state. You practise the actual graded work:
+
+| Day | What you do (this earns marks) | File(s) |
+|---|---|---|
+| Day 1 | MA1 — pentest the CMS target from Kali (Information Gathering → CMS exploit → user pwd crack → root privesc → 150-word report + top-3 risks) | `10_Day1_MA1_Solution.md` |
+| Day 2 | MA2 — configure pfSense rules + OpenVPN + Snort, harden LinSRV1, create 7 GPOs + share + audit on WINSRV1, finish the issuing CA on WINSRV3, verify everything from Client1/2/3 | `20_…` through `30_…` |
+| Day 3 | CTF — solve VulnHub VM(s) + Juice Shop challenges | `50_…`, `51_…`, `52_…` |
+
+**Why two stages:**
+- Stage A is a **one-time prep cost** (~15 hours total). Without it, your ESXi is empty and you have nothing to practise on.
+- Stage B is the **actual training** (each full Day 1+2+3 dry-run = ~12 hours). Run it 3+ times to build muscle memory.
+- After Stage A, every dry-run costs 30 seconds of snapshot restore + 12 hours of practice. Without snapshots, every mistake = re-installing VMs = hours wasted.
+
+> 🔑 **The whole point** of Stage A is to build what the organisers would hand you on competition day. Stage B is what actually trains you to win.
+
+---
+
+## How to use this guide (file order)
+
+### Phase 1 — Stage A setup (one-time, ~15 hours over the first week)
 1. **`01_Setup_Tools.md`** — every download + install instruction.
 2. **`02_Setup_Topology.md`** (or **`02b_Setup_SinglePC_Practice.md`** if you only have one PC) — wiring + virtual networks.
 3. **`02c_Setup_ESXi_Server.md`** — only if using the 3-PC ESXi rig.
 4. **`08_Setup_Workstations_HostOS.md`** — Windows host prep + best practices.
-
-### Phase 2 — Build the practice VMs (one-time, ~4 hours)
 5. **`03_Setup_VMs_MA1.md`** — CMS pentest target + Kali (2 VMs on 192.168.2.0/24).
 6. **`04_Setup_VMs_MA2.md`** — manila.com environment (9 VMs across 4 VLANs).
 7. **`05_Setup_JuiceShop.md`** — Juice Shop on host or Kali.
 8. **`06_Setup_VulnHub.md`** — download + import VulnHub VMs.
 
-### Phase 3 — Practice the deliverables (repeat 3+ times)
-9. **`10_Day1_MA1_Solution.md`** — Day 1 (full day) MA1 CMS pentest walkthrough (4 tasks).
+### Phase 2 — Stage B practice (repeat 3+ times in week 2)
+9. **`10_Day1_MA1_Solution.md`** — Day 1 MA1 CMS pentest walkthrough (4 tasks).
 10. **`20_Day1_MA2_Firewall.md`** through **`30_Day1_MA2_Verification.md`** — Day 2 hardening (5 files).
-11. **`50_Day3_CTF_Playbook.md`** + **`51_Day3_VulnHub_BootToRoot.md`** + **`52_Day3_CTF_Advanced.md`** — Day 3 CTF playbooks.
+11. **`50_Day3_CTF_Playbook.md`** + **`51_Day3_VulnHub_BootToRoot.md`** + **`52_Day3_CTF_Advanced.md`** — Day 3 CTF.
 
-### Phase 4 — Track and improve
-12. **`90_Practice_Schedule.md`** — 2-week calendar.
-13. **`99_Marking_Map.md`** — tick what you completed after every dry-run.
+### Phase 3 — Track and improve
+12. **`90_Practice_Schedule.md`** — 2-week calendar with day-by-day tasks.
+13. **`99_Marking_Map.md`** — tick what you completed after every dry-run; running raw score per criterion.
 
 ---
 
