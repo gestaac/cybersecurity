@@ -80,24 +80,109 @@ You need a **bootable USB** with the ESXi 8 ISO. Done from any Windows PC (e.g. 
 Plug the USB into the 3rd PC. Don't power on yet.
 
 ### C.1 Enter BIOS
-Power on → press the BIOS hotkey **immediately** (typically **F2**, **F10**, **Del**, or **Esc** — depends on motherboard). Spam it during the splash logo.
+Power on → press the BIOS hotkey **immediately** (typically **F2**, **Del**, **F10**, or **Esc** — depends on motherboard brand). Spam it during the splash logo.
+
+| Motherboard brand | Common hotkey |
+|---|---|
+| Gigabyte | **Del** or **F2** |
+| ASUS | **Del** or **F2** |
+| MSI | **Del** |
+| ASRock | **F2** or **Del** |
+| Dell | **F2** |
+| HP | **F10** |
+| Lenovo | **F1** or **F2** |
 
 ### C.2 Settings to enable
 
-| Setting | Path varies; look for | Value |
+#### C.2.1 — Generic settings table (matches any vendor)
+
+| Setting | What it does | Value |
 |---|---|---|
-| Intel Virtualization Technology (VT-x) | *Advanced → CPU Configuration* | **Enabled** |
-| Intel VT-d / IOMMU | *Advanced → CPU Configuration* | **Enabled** (harmless if off) |
-| Hyper-Threading | *Advanced → CPU Configuration* | **Enabled** |
-| Secure Boot | *Boot* or *Security* | **Disabled** |
-| CSM / Legacy Boot | *Boot* | UEFI preferred (set to UEFI only); Legacy works too if you wrote the USB as MBR in Rufus |
-| Boot order | *Boot* | **USB first** (or use one-time boot menu via F8/F12 at next power-on) |
-| Power on after AC loss | *Power Management* | **On** (so the server auto-recovers from blackouts) |
+| Intel Virtualization Technology (VT-x) / AMD-V (SVM) | Required for VMware to use hardware acceleration | **Enabled** |
+| Intel VT-d / IOMMU | Lets VMs do DMA (improves disk/network perf, harmless if off) | **Enabled** |
+| Hyper-Threading | Doubles logical core count | **Enabled** |
+| Secure Boot | Cryptographically verifies bootloader — **blocks ESXi installer** | **Disabled** |
+| Boot Mode (UEFI vs Legacy/CSM) | Disk partitioning style | **UEFI** preferred (or Legacy if you wrote USB as MBR in Rufus) |
+| Fast Boot | Skips BIOS POST | **Disabled** (so F12 boot menu works reliably) |
+| Boot order | First boot device | **USB first** (or use one-time F12 menu) |
+| Power on after AC loss | Auto-recover from blackouts | **On** |
 
-Save (usually **F10**) and reboot.
+#### C.2.2 — Gigabyte BIOS-specific path (your motherboard)
 
-### C.3 Boot from USB
-At the next splash, press the one-time boot menu hotkey (**F8**, **F11**, or **F12** — depends on motherboard) → pick the USB stick.
+Your Gigabyte board has these top tabs: `M.I.T. | System | BIOS | Peripherals | Chipset | Power | Save & Exit`. Here's the exact path for each setting:
+
+**Step 1 — Enable Intel VT-x (the critical one)**
+1. Top tab → **M.I.T.** (it's where your screen currently is — Motherboard Intelligent Tweaker).
+2. Scroll down → highlight **Advanced CPU Core Settings** → press **Enter**.
+3. Inside, scroll to find one of these (name varies by Gigabyte BIOS version):
+   - **Intel Virtualization Technology** → set to **Enabled**, OR
+   - **VT-x** → **Enabled**, OR
+   - **SVM Mode** (if AMD CPU) → **Enabled**
+4. Press **Enter** → choose **Enabled** → press **Enter** to confirm.
+
+**Step 2 — Enable VT-d (recommended)**
+- Same screen (Advanced CPU Core Settings):
+- **VT-d** OR **Intel VT-d (Direct I/O)** → **Enabled**.
+- If not visible there, try **Chipset** tab → **VT-d** option.
+
+**Step 3 — Verify Hyper-Threading is on**
+- Same screen:
+- **Hyper-Threading Technology** OR **Intel(R) Hyper-Threading Technology** → **Enabled** (default — verify).
+
+**Step 4 — Disable Secure Boot (only if doing bare-metal ESXi install)**
+- Press **Esc** to back out to top tabs.
+- Top tab → **BIOS**.
+- Scroll to **Secure Boot** entry. On many Gigabyte boards you must first set:
+  - **OS Type** → **Other OS** (this unlocks Secure Boot toggle)
+  - Then **Secure Boot** → **Disabled**
+- Or sub-menu: **Secure Boot → Secure Boot Mode → Custom → Secure Boot Enable → Disabled**.
+
+**Step 5 — Boot mode + Fast Boot**
+- Same **BIOS** tab:
+- **Boot Mode**: leave as **UEFI** (default; matches GPT in Rufus).
+- **CSM Support**: **Disabled** (since UEFI).
+- **Fast Boot**: **Disabled**.
+- **Boot Option Priorities**: put your USB first if you want it to boot automatically (or just use F12 boot menu — easier).
+
+**Step 6 — Power on after AC loss**
+- Top tab → **Power**.
+- **AC BACK** OR **Power On after Power Failure** → **Always On** (or "Last State" if you want it to remember).
+
+**Step 7 — Save and exit**
+- Top tab → **Save & Exit**.
+- **Save & Exit Setup** (or press **F10**) → **Yes**.
+- PC reboots.
+
+#### C.2.3 — Generic vendor-specific paths (if not Gigabyte)
+
+| Vendor | VT-x location | Secure Boot location |
+|---|---|---|
+| **ASUS** | Advanced → CPU Configuration → Intel Virtualization Technology | Boot → Secure Boot → OS Type → Other OS, then Secure Boot Control → Disabled |
+| **MSI** | OC → CPU Features → Intel Virtualization Tech | Settings → Advanced → Windows OS Configuration → Secure Boot → Disabled |
+| **ASRock** | Advanced → CPU Configuration → Intel Virtualization Technology | Security → Secure Boot → Disabled |
+| **Dell OptiPlex / Precision** | Virtualization Support → Virtualization → Enabled | Secure Boot → Secure Boot Enable → Disabled |
+| **HP** | Advanced → System Options → Virtualization Technology (VTx) | Advanced → Secure Boot Configuration → Disabled |
+| **Lenovo ThinkCentre** | Advanced → CPU Setup → Intel Virtualization Technology | Security → Secure Boot → Disabled |
+
+> 🔑 **Universal trick:** if you can't find a setting, use the BIOS search feature (most modern UEFI BIOSes — usually F-key or `/` shortcut) and type "virtualization" or "secure boot".
+
+#### C.2.4 — Which BIOS changes you actually need (depends on your install path)
+
+| Install path | BIOS changes required |
+|---|---|
+| **Bare-metal ESXi** (replaces Windows on the 3rd PC) | All of Steps 1–7 above |
+| **Nested ESXi** (ESXi as a VM inside VMware Workstation on the 3rd PC) | Only Steps 1 + 2 (VT-x + VT-d). Skip Secure Boot, boot mode, USB priority. |
+| **Workstation directly** (no ESXi at all — single-PC mode per `02b_…`) | Only Step 1 (VT-x). |
+
+After applying, **Save & Exit (F10)** and reboot.
+
+### C.3 Boot from USB (only for bare-metal ESXi install)
+
+At the Gigabyte splash logo on next reboot:
+- Press **F12** repeatedly → boot menu appears → arrow-key to your USB → Enter.
+- (If F12 doesn't work, try **F11**. Some older Gigabyte boards use F12 only in UEFI mode, F11 in Legacy.)
+
+> Skip this step entirely if you're using nested ESXi or single-PC Workstation mode.
 
 ---
 
