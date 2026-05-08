@@ -1,34 +1,25 @@
-# 02d — Install ESXi 8 on Bare Metal with Realtek NIC (Fresh-Start Guide)
+# 02d — Install ESXi 8 on Bare Metal with Realtek Driver Injection
 
-This guide assumes you have **fresh Windows 10 installed on your build PC (PC1)** with **nothing else installed yet**. It walks you through every download, install, command, and verification step needed to get ESXi 8 running bare-metal on your 3rd PC, even though it has an unsupported Realtek NIC.
+This guide walks you through installing ESXi 8.0 Update 3 directly on bare-metal hardware (a PC with onboard Realtek NIC), by injecting the Realtek driver Fling into a stock ESXi installer USB.
+
+The standard ESXi 8 installer **doesn't include** a Realtek driver. The free Broadcom **Realtek Network Driver Fling** adds support for RTL8111/8125/8126/8127 chipsets. We weld it onto the installer USB so the installer can see the NIC during install, then persist the driver to the installed system after.
 
 > **Source:** William Lam, Feb 2026 — `https://williamlam.com/2026/02/installing-realtek-network-driver-fling-using-free-esxi-8-0-update-3e-iso.html`
 
+> Assumes: a fresh Windows 10/11 build PC (PC1) with nothing yet installed, and a separate target PC (3rd PC) where ESXi will run bare-metal.
+
 ---
 
-## ⚠️ Read this section FIRST — hardware compatibility check
+## ⚠️ Hardware compatibility — read first
 
-The Gigabyte B360 HD3 motherboard's onboard Realtek NIC has subsystem ID `SUBSYS_E0001458` (Gigabyte Dragon rebrand). The Broadcom Realtek Fling 1.101.01 driver does **not** automatically claim this specific subsystem variant.
+The Realtek Fling supports specific chips: **RTL8111 / RTL8125 / RTL8126 / RTL8127**.
 
-**Practical implication:** even with a perfectly-built modified ESXi installer, the bare-metal install on this motherboard will fail with **"There are no supported network interfaces on this host"** because the driver loads but doesn't bind to the chip.
+**Critical caveat for some Gigabyte motherboards:** boards with Realtek subsystem ID `SUBSYS_E0001458` (Gigabyte "Dragon" rebrand of RTL8111H — common on B360 HD3) have an issue where the Fling driver loads but **doesn't bind to that specific subsystem variant**. If you hit this after install (`No compatible network adapter found` on first boot from disk), the only reliable fix is to add a different supported NIC:
 
-### Required: ONE of these to make the install succeed
+- **USB 3.0 → Gigabit Ethernet adapter** with **ASIX AX88179** or **Realtek RTL8153** chip (~₱300–500 same-day in Manila) — works via the *USB Network Native Driver Fling*. See **Appendix A** at the end of this guide.
+- **Intel I210-T1 PCIe x1 NIC card** (~₱600–900, 1–2 days) — ESXi 8 has built-in Intel I210 support, no driver hacking needed.
 
-You **must** acquire one of the following before starting:
-
-| Hardware | Cost (PH) | Delivery | Why it works |
-|---|---|---|---|
-| **USB 3.0 → Gigabit Ethernet adapter with ASIX AX88179 or Realtek RTL8153 chip** | ₱300–500 | Same-day in Manila | ESXi has supported drivers via the USB Network Native Driver Fling |
-| **Intel I210-T1 PCIe x1 NIC card** ⭐ recommended | ₱600–900 | 1–2 days | ESXi has built-in native Intel I210 support — no driver hacking needed |
-
-**Without one of these, the install will fail.** This is a hardware compatibility issue that no software workaround fixes reliably.
-
-### Buying recommendations (Lazada/Shopee PH)
-
-- **USB Ethernet (cheapest, fastest):** search "**USB 3.0 Gigabit Ethernet AX88179**" — pick a seller with same-day Manila delivery.
-- **Intel I210-T1 (cleanest):** search "**Intel I210-T1**" or "**Intel EXPI9301CT**" — both ESXi-native.
-
-> 💡 **Smart move:** order BOTH. USB adapter for tomorrow's practice, Intel card for the long-term competition rig. Total ~₱1,000.
+**Try the Realtek-only path first.** If it works on your specific motherboard revision, great. If not, fall back to one of the two hardware options above.
 
 ---
 
@@ -36,163 +27,124 @@ You **must** acquire one of the following before starting:
 
 | Phase | What | Time |
 |---|---|---|
-| 1 | Install build tools on Windows 10 (7-Zip, Notepad++, Rufus) | 15 min |
-| 2 | Create a Broadcom account + download ESXi ISO + Realtek Fling + USB Network Fling | 30 min |
-| 3 | Extract drivers using 7-Zip command line | 10 min |
-| 4 | Write USB and modify it with both drivers | 15 min |
-| 5 | BIOS prep on the 3rd PC (Gigabyte B360 HD3) | 5 min |
+| 1 | Install build tools on Windows (7-Zip, Notepad++, Rufus) | 15 min |
+| 2 | Create Broadcom account + download ESXi ISO + Realtek Fling | 25 min |
+| 3 | Extract `ifre.v00` from the Fling using 7-Zip command-line | 5 min |
+| 4 | Write USB with Rufus, then drop `ifre.v00` on it and edit `boot.cfg` | 15 min |
+| 5 | BIOS prep on the 3rd PC | 5 min |
 | 6 | Install ESXi from the modified USB | 15 min |
-| 7 | Post-install: copy drivers to bootbanks, edit boot.cfg | 10 min |
+| 7 | Post-install: copy `ifre.v00` to bootbanks, edit `boot.cfg` (do NOT reboot until done) | 10 min |
 | 8 | Verify and configure network | 10 min |
-| **Total** | | **~110 min** |
+| **Total** | | **~100 min** |
 
 ---
 
-# Phase 1 — Install build tools on Windows 10 (15 min)
+# Phase 1 — Install build tools on Windows (15 min)
 
-You need these three free tools on the build PC. Install in this order.
+Three free tools on the build PC (PC1). Install in this order.
 
-## 1.1 — 7-Zip (file extraction)
+## 1.1 — 7-Zip
 
-1. Open **Edge** browser on the fresh Windows 10.
-2. Go to: **`https://www.7-zip.org/`**
-3. Download the **64-bit x64 version** (top of the page, ~1.5 MB `.exe`).
-4. Run the installer. Defaults are fine. Install path: `C:\Program Files\7-Zip\`.
-5. Verify: open File Explorer → right-click any file → **7-Zip** menu should appear in the context menu.
+1. Browser → **`https://www.7-zip.org/`**
+2. Download **64-bit x64 version** (~1.5 MB `.exe`).
+3. Run installer with defaults. Install path: `C:\Program Files\7-Zip\`.
 
-## 1.2 — Notepad++ (BOOT.CFG editing — preserves Unix line endings)
+## 1.2 — Notepad++ (preserves Unix line endings — required for boot.cfg)
 
-⚠️ **DO NOT use regular Notepad.** Windows Notepad converts Unix LF line endings to Windows CRLF, which breaks `BOOT.CFG`.
+⚠️ **Do not use regular Windows Notepad.** It converts Unix LF to Windows CRLF and breaks `boot.cfg`.
 
 1. Browser → **`https://notepad-plus-plus.org/downloads/`**
-2. Download the latest version (current: 8.x), **64-bit Installer** (~5 MB).
-3. Run installer with defaults.
+2. Download latest 64-bit installer (~5 MB).
+3. Install with defaults.
 
 ## 1.3 — Rufus (USB writer)
 
 1. Browser → **`https://rufus.ie/`**
-2. Click **Rufus 4.x** (Standard version, ~1.5 MB portable `.exe`).
-3. Save to `Downloads\Rufus.exe`. **No install needed** — it's portable.
+2. Click **Rufus 4.x** (Standard, ~1.5 MB portable .exe).
+3. Save to `Downloads\Rufus.exe` — no install needed.
 
-## 1.4 — Create a working folder
+## 1.4 — Working folder
 
-Open File Explorer. Create:
 ```
 D:\esxi-build\
 ```
 
-(If your build PC has only a C: drive, use `C:\esxi-build\` everywhere instead. Adjust paths as you go.)
+(If your PC has only C: drive, use `C:\esxi-build\` and adjust paths.)
 
 ---
 
-# Phase 2 — Downloads (30 min, mostly waiting)
+# Phase 2 — Downloads (25 min)
 
-You need three files — all from Broadcom's portal (free with registration).
-
-## 2.1 — Create a Broadcom account (one-time, 5 min)
+## 2.1 — Create a Broadcom account
 
 1. Browser → **`https://support.broadcom.com/`**
-2. Click **Register** (top right).
-3. Fill in email, name, phone (any valid info).
-4. Verify email via the confirmation link Broadcom emails you.
-5. Sign in with the new account.
+2. Click **Register** (top right). Use any valid email.
+3. Verify via email confirmation link.
+4. Sign in.
 
-## 2.2 — Download ESXi 8.0 Update 3 ISO (~640 MB, 10 min)
+## 2.2 — Download ESXi 8.0 Update 3 ISO (~640 MB)
 
-1. From the Broadcom portal home → search bar → type "**VMware vSphere Hypervisor 8**".
-2. Click the result for **VMware vSphere Hypervisor (Free)**.
-3. Pick the latest **8.0 Update 3** version (current: build 24677879 or 24585291 = U3e).
-4. Accept the EULA → confirm export compliance → click the download link for the **ESXi installer ISO**.
-5. Filename will be something like:
+1. From Broadcom portal → search "**VMware vSphere Hypervisor 8**".
+2. Pick **VMware vSphere Hypervisor (Free) 8.0 Update 3**.
+3. Accept EULA → download the installer ISO. Filename like:
    ```
    VMware-VMvisor-Installer-8.0U3-24677879.x86_64.iso
    ```
-6. Save to `D:\esxi-build\`.
-7. **Copy the free license key** from the same download page — paste it into a text file `D:\esxi-build\license.txt` so you don't lose it.
+4. Save to `D:\esxi-build\`.
+5. **Copy the free license key** from the same page → save to `D:\esxi-build\license.txt`.
 
-## 2.3 — Download the Realtek Driver Fling (~250 KB, 2 min)
+## 2.3 — Download the Realtek Driver Fling
 
-Same Broadcom portal.
-
-1. Navigate to: **`https://support.broadcom.com/group/ecx/productdownloads?subfamily=Flings&freeDownloads=true`**
+1. Browser → **`https://support.broadcom.com/group/ecx/productdownloads?subfamily=Flings&freeDownloads=true`**
 2. Find **Realtek Network Driver for ESXi**.
 3. Latest version: **1.101.01** (Nov 2025).
-4. Download the ZIP bundle. Filename like:
+4. Download the ZIP. Filename like:
    ```
    VMware-Re-Driver_1.101.01-5vmw.800.1.0.20613240.zip
    ```
 5. Save to `D:\esxi-build\`.
 
-## 2.4 — Download the USB Network Native Driver Fling (~200 KB, 2 min)
-
-This is what makes USB-Ethernet adapters work in ESXi.
-
-1. Same Broadcom Flings page: **`https://support.broadcom.com/group/ecx/productdownloads?subfamily=Flings&freeDownloads=true`**
-2. Find **USB Network Native Driver for ESXi**.
-3. Pick the version compatible with **ESXi 8.0** (latest is usually 1.13 or newer).
-4. Download the offline bundle ZIP. Filename like:
-   ```
-   ESXi800-VMKUSB-NIC-FLING-xxxxx-component.zip
-   ```
-5. Save to `D:\esxi-build\`.
-
-After Phase 2, your `D:\esxi-build\` folder should contain:
+After Phase 2, `D:\esxi-build\` should contain:
 ```
-D:\esxi-build\
-├── VMware-VMvisor-Installer-8.0U3-...iso        (~640 MB)
-├── VMware-Re-Driver_1.101.01-...zip             (~210 KB)
-├── ESXi800-VMKUSB-NIC-FLING-...zip              (~200 KB)
-└── license.txt                                   (your free ESXi license key)
-```
-
-Verify with PowerShell:
-```powershell
-cd D:\esxi-build
-Get-ChildItem -File | Format-Table Name, Length
+VMware-VMvisor-Installer-8.0U3-...iso          (~640 MB)
+VMware-Re-Driver_1.101.01-...zip                (~210 KB)
+license.txt
 ```
 
 ---
 
-# Phase 3 — Extract drivers (10 min)
+# Phase 3 — Extract `ifre.v00` (5 min)
 
-We'll extract `ifre.v00` (Realtek) and `vmkusb_nic_fling.v00` (USB-Ethernet).
-
-## 3.1 — Extract the Realtek `.vib` from its ZIP
-
-Open **PowerShell** (regular, non-admin is fine). Type:
+Open **PowerShell** in `D:\esxi-build\`:
 
 ```powershell
 cd D:\esxi-build
+```
+
+## 3.1 — Extract the `.vib` from the Fling ZIP
+
+```powershell
 & "C:\Program Files\7-Zip\7z.exe" e .\VMware-Re-Driver_1.101.01-*.zip
 ```
 
-After extraction, your folder has:
-```
-vmw_bootbank_if-re_1.101.01-5vmw.800.1.0.20613240.vib    (~226 KB)
-metadata.zip                                              (~3 KB)
-```
+Result: a `.vib` file appears (~226 KB) plus a small `metadata.zip`.
 
-## 3.2 — Extract the Realtek driver payload from the `.vib`
-
-A `.vib` file is a Unix `ar` archive. 7-Zip handles it. Run:
+## 3.2 — Extract the driver payload from the `.vib`
 
 ```powershell
 & "C:\Program Files\7-Zip\7z.exe" e .\vmw_bootbank_if-re_1.101.01-*.vib
 ```
 
-After extraction:
-```
-vmw_bootbank_if-re_1.101.01-5vmw.800.1.0.20613240    (~1.2 MB, no extension — driver payload)
-```
+Result: a file with the long name `vmw_bootbank_if-re_1.101.01-5vmw.800.1.0.20613240` (~1.2 MB, no extension) — that's the driver payload.
 
-⚠️ **7-Zip naming quirk:** the extracted file inherits the long `.vib` filename without an extension. **This IS the driver — just renamed weirdly.**
+## 3.3 — Rename to `ifre.v00`
 
-Rename to `ifre.v00`:
 ```powershell
 Rename-Item ".\vmw_bootbank_if-re_1.101.01-5vmw.800.1.0.20613240" "ifre.v00"
 ```
 
-Verify:
+## 3.4 — Verify
+
 ```powershell
 Get-Item .\ifre.v00 | Format-List Name, Length
 ```
@@ -203,60 +155,7 @@ Name   : ifre.v00
 Length : 1229357
 ```
 
-## 3.3 — Extract the USB Network driver from its ZIP
-
-```powershell
-& "C:\Program Files\7-Zip\7z.exe" e .\ESXi800-VMKUSB-NIC-FLING-*.zip
-```
-
-After extraction, look for a file like:
-```
-vmw_bootbank_vmkusb-nic-fling_1.13-1vmw.x.x.x.vib    (~150 KB)
-```
-
-## 3.4 — Extract the USB Network driver payload
-
-```powershell
-& "C:\Program Files\7-Zip\7z.exe" e .\vmw_bootbank_vmkusb-nic-fling_*.vib
-```
-
-You'll get a payload file with a long name. Rename it:
-```powershell
-# Find the largest non-.vib file
-Get-ChildItem -File | Where-Object { $_.Name -notmatch '\.(vib|zip|iso|xml|pkcs7|txt)$' } | Sort-Object Length -Descending | Select-Object Name, Length -First 5
-
-# Rename whatever the largest payload is — substitute the actual filename:
-Rename-Item ".\<long-filename>" "vmkusb_nic_fling.v00"
-```
-
-Verify:
-```powershell
-Get-Item .\vmkusb_nic_fling.v00 | Format-List Name, Length
-```
-
-Expected: ~600 KB to 1.5 MB.
-
-## 3.5 — Cleanup leftover files (optional)
-
-Your folder now has many extra files (descriptor.xml, sig.pkcs7, metadata.zip, etc.). The two we need are `ifre.v00` and `vmkusb_nic_fling.v00`. The rest can be deleted, but keep the two original `.zip` and `.vib` files as backups:
-
-```powershell
-Remove-Item .\descriptor.xml -ErrorAction SilentlyContinue
-Remove-Item .\sig.pkcs7 -ErrorAction SilentlyContinue
-Remove-Item .\metadata.zip -ErrorAction SilentlyContinue
-```
-
-After Phase 3, `D:\esxi-build\` has:
-```
-VMware-VMvisor-Installer-8.0U3-...iso          (~640 MB — stock ESXi installer)
-ifre.v00                                        (~1.2 MB — Realtek driver)
-vmkusb_nic_fling.v00                            (~700 KB — USB-Ethernet driver)
-VMware-Re-Driver_1.101.01-...zip                (backup)
-ESXi800-VMKUSB-NIC-FLING-...zip                 (backup)
-vmw_bootbank_if-re_*.vib                        (backup)
-vmw_bootbank_vmkusb-nic-fling_*.vib             (backup)
-license.txt                                     (license key)
-```
+> 📏 The Fling 1.101.01 payload is ~1.2 MB because it includes drivers for 4 chip families. Older internet docs that mention "50–250 KB" refer to older single-chip community VIBs — not relevant here.
 
 ---
 
@@ -264,230 +163,155 @@ license.txt                                     (license key)
 
 ## 4.1 — Plug in your USB stick
 
-Use a USB stick **8 GB or larger**. Everything on it gets wiped.
+8 GB or larger. Everything on it gets wiped.
 
 ## 4.2 — Write the stock ESXi ISO with Rufus
 
 1. Run `Rufus.exe`.
 2. **Device:** select your USB stick.
-3. **Boot selection:** click **SELECT** → choose `VMware-VMvisor-Installer-8.0U3-...iso`.
+3. **Boot selection** → **SELECT** → pick `VMware-VMvisor-Installer-8.0U3-...iso`.
 4. **Partition scheme:** **GPT**.
 5. **Target system:** **UEFI (non CSM)**.
-6. **File system:** leave default (Rufus picks the right one).
-7. Click **START**.
-8. Prompt: *"Write in DD Image mode?"* → click **Yes**.
-9. Confirm wipe → wait ~3 min.
-10. **Don't eject yet** — we still need to add files.
+6. Click **START**.
+7. Prompt: *"Write in DD Image mode?"* → click **Yes**.
+8. Confirm wipe → wait ~3 min.
+9. **Don't eject yet.**
 
-## 4.3 — Browse the USB partitions
+## 4.3 — Find the USB's boot partition
 
-The DD-mode write creates multiple partitions on the USB. Windows will see one as a drive letter (e.g., `D:\` labelled `TESTING-ESXI`). The relevant partition is the **EFI boot partition** (FAT16/FAT32) which contains:
+After Rufus finishes, Windows will assign at least one drive letter to the USB's partitions (e.g., `E:\` labeled `TESTING-ESXI` or `ESXI-X.X.X`). The relevant partition is the **EFI/FAT boot partition** containing:
 
 - Root files: `b.b00`, `k.b00`, `boot.cfg`, `*.v00`, etc.
 - A folder `efi\boot\` with `boot.cfg`, `bootx64.efi`, etc.
 
-If you can't see the partition:
-- Check Disk Management (Win+X → Disk Management) — confirm the USB has at least 2 partitions.
-- The boot partition is the small (~ a few hundred MB) FAT one.
-- If it's not assigned a drive letter, right-click → Change Drive Letter and Paths → Add → assign one.
+If multiple partitions appear, pick the one with `boot.cfg` at the root.
 
-## 4.4 — Copy the two drivers to the USB
+> ⚠️ Windows may show "Format disk" prompts for unfamiliar partitions. **Always click Cancel** — don't format anything.
 
-Suppose Windows assigned **`E:\`** to the boot partition (adjust to your actual letter).
+## 4.4 — Copy `ifre.v00` to TWO locations on the USB
 
-Copy `ifre.v00` and `vmkusb_nic_fling.v00` to TWO locations on the USB:
+Adjust `E:\` to whatever drive letter Windows assigned:
 
 ```powershell
-# Adjust E:\ to your actual USB drive letter
 $usb = "E:\"
 
-# Copy to USB root (alongside b.b00, etc.)
+# Copy to USB root (next to b.b00, etc.)
 Copy-Item D:\esxi-build\ifre.v00 "$usb\ifre.v00"
-Copy-Item D:\esxi-build\vmkusb_nic_fling.v00 "$usb\vmkusb_nic_fling.v00"
 
 # Copy also to EFI\BOOT folder (for UEFI boot path)
 Copy-Item D:\esxi-build\ifre.v00 "$usb\efi\boot\ifre.v00"
-Copy-Item D:\esxi-build\vmkusb_nic_fling.v00 "$usb\efi\boot\vmkusb_nic_fling.v00"
 ```
 
-## 4.5 — Edit BOTH `boot.cfg` files on the USB
+## 4.5 — Edit BOTH `boot.cfg` files
 
-There are two `boot.cfg` files on the USB:
-- `E:\boot.cfg` (root)
-- `E:\efi\boot\boot.cfg` (EFI boot path — used by modern UEFI BIOS)
+Two `boot.cfg` files exist on the USB:
+- `E:\boot.cfg` (root — Legacy BIOS path)
+- `E:\efi\boot\boot.cfg` (UEFI path — used by modern Gigabyte boards)
 
-**Edit BOTH.** Open each with **Notepad++** (NOT regular Notepad).
+**Edit BOTH** with **Notepad++** (NOT regular Notepad).
 
-In each file, find the line beginning with `modules=`. It's a **single very long line** with module names separated by ` --- `. Append at the very end:
+Find the line beginning with `modules=`. It's a single very long line with module names separated by ` --- `. Append at the very end:
 
 ```
- --- /ifre.v00 --- /vmkusb_nic_fling.v00
+ --- /ifre.v00
 ```
 
 So the line ends with:
 ```
-... --- /imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00
+... --- /imgpayld.tgz --- /ifre.v00
 ```
 
-Save each file. Notepad++ auto-preserves Unix line endings.
+Save each file (Notepad++ preserves Unix LF line endings automatically).
 
 ## 4.6 — Safely eject the USB
 
-In File Explorer, right-click the USB drive → **Eject**.
+In File Explorer → right-click the USB drive → **Eject**.
 
 ---
 
 # Phase 5 — BIOS prep on the 3rd PC (5 min)
 
-## 5.1 — Plug in your USB-Ethernet adapter (or confirm Intel NIC is installed)
+Plug the USB into the 3rd PC. Power on, spam **Del** at the Gigabyte splash.
 
-If you bought a **USB Ethernet adapter:** plug it into a USB 3.0 port (blue inside) on the 3rd PC.
+## 5.1 — Settings to apply
 
-If you bought an **Intel I210-T1 PCIe card:** power off the 3rd PC, install the card in any free PCIe x1 slot, close the case.
-
-## 5.2 — Enter BIOS
-
-Power on the 3rd PC → spam **Del** key during the Gigabyte splash logo.
-
-## 5.3 — Settings to enable
-
-Navigate using arrow keys. On Gigabyte B360 HD3:
-
-| Setting | Path | Value |
+| Setting | Path on Gigabyte BIOS | Value |
 |---|---|---|
-| Intel Virtualization Technology (VT-x) | **M.I.T. → Advanced CPU Core Settings** | **Enabled** |
-| Intel VT-d | **M.I.T. → Advanced CPU Core Settings** | **Enabled** |
-| Hyper-Threading | **M.I.T. → Advanced CPU Core Settings** | **Enabled** |
-| Secure Boot | **BIOS → Secure Boot** (set OS Type → Other OS first if needed) | **Disabled** |
-| Boot Mode | **BIOS** | **UEFI** |
-| Fast Boot | **BIOS** | **Disabled** |
-| AC BACK / Restore on AC Loss | **Power** | **Always On** (optional but recommended) |
+| Intel Virtualization Technology (VT-x) | M.I.T. → Advanced CPU Core Settings | **Enabled** |
+| Intel VT-d | M.I.T. → Advanced CPU Core Settings | **Enabled** |
+| Hyper-Threading | M.I.T. → Advanced CPU Core Settings | **Enabled** |
+| Secure Boot | BIOS → Secure Boot (set OS Type → Other OS first if greyed out) | **Disabled** |
+| Boot Mode | BIOS | **UEFI** |
+| Fast Boot | BIOS | **Disabled** |
+| AC BACK / Restore on AC Loss | Power | **Always On** (optional) |
 
 Press **F10** → **Yes** to save and exit. PC reboots.
 
 ---
 
-# Phase 6 — Install ESXi (15 min)
+# Phase 6 — Install ESXi from the USB (15 min)
 
-## 6.1 — Boot from the USB
+## 6.1 — Boot from USB
 
-When the Gigabyte splash logo appears after reboot, spam **F12** to open the boot menu. Select your USB stick → **Enter**.
+At the next Gigabyte splash, spam **F12** → boot menu → select your USB → Enter.
 
-## 6.2 — Watch for driver loads
+## 6.2 — Watch for the driver load
 
-The boot text scrolls fast. Look for these lines:
+Boot text scrolls fast. Among the lines, you should see:
 ```
 Loading /ifre.v00
-Loading /vmkusb_nic_fling.v00
 ```
 
-Both should appear without errors. If you see a "module not found" error → check that you copied the files to the USB root (Phase 4.4) and edited `boot.cfg` correctly (Phase 4.5).
+If you see it without "module not found" → success, the driver loaded.
 
-## 6.3 — ESXi installer launches
+## 6.3 — Run the installer wizard
 
-You should see **"VMware ESXi 8.0.x Installer"** with a blue welcome screen.
-
-If you still see **"No Network Adapters"**:
-- The Realtek onboard NIC didn't bind (expected — we knew this).
-- The USB-Ethernet adapter wasn't recognized.
-  - Check: USB plugged into a USB 3.0 port (blue), not USB 2.0.
-  - Check: USB adapter is on the supported chip list (AX88179, RTL8153, etc.).
-  - Try a different USB port.
-
-If both NICs are unrecognized → the USB adapter isn't supported by the Fling. Try a different USB adapter chip, or use the Intel I210-T1 PCIe card path instead.
-
-## 6.4 — Run the installer
-
-1. Welcome screen → press **Enter** to continue.
-2. EULA → press **F11** to accept.
-3. **Disk selection:** the installer shows local disks. Select your SSD/HDD. **Press Enter.**
-4. **Keyboard layout:** **US Default** → Enter.
-5. **Root password:** set a strong password (you'll need this for ESXi web UI). Write it down.
+1. Welcome screen → **Enter**.
+2. EULA → **F11** to accept.
+3. **Disk selection:** pick your SSD/HDD → **Enter**.
+4. **Keyboard:** US Default → **Enter**.
+5. **Root password:** strong password — write it down.
 6. Confirm install → **F11**.
 7. Wait ~5 min while it installs.
 
-## 6.5 — DON'T REBOOT YET
+## 6.4 — ⚠️ DO NOT REBOOT YET
 
-When it finishes, the screen prompts to **press Enter to reboot**. **Stop here.**
+When the screen prompts **"Press Enter to reboot"** — **STOP**.
 
-If you reboot now, the system will boot from the installed ESXi on disk — but **the bootbanks don't have `ifre.v00` and `vmkusb_nic_fling.v00`** yet. Drivers need to be copied first.
+If you reboot now, you'll see **"No compatible network adapter found"** because the driver `ifre.v00` is on the USB but not yet in the persistent bootbanks on disk.
 
-Press **Alt+F1** to drop to a console login.
-- Username: `root`
-- Password: (whatever you just set)
+Press **Alt+F1** to drop to the console shell.
+- Login: `root` / your password.
 
-You're now at the ESXi shell.
+You're now at the ESXi shell. Continue to Phase 7.
+
+> 💡 **If you already rebooted by mistake** and see "No compatible network adapter found" — see **Phase 7.0 Recovery** below.
 
 ---
 
-# Phase 7 — Post-install: copy drivers + edit boot.cfg (10 min)
+# Phase 7 — Post-install: persist the driver (10 min)
 
-> ⚠️ **CRITICAL:** if you already rebooted from disk (got "no compatible network adapter found"), see **Section 7.0 Recovery** below before doing anything else.
+> Background: when ESXi boots from a USB whose `boot.cfg` lists `ifre.v00`, the kernel auto-mounts each loaded module under `/tardisks/`. So `/tardisks/ifre.v00` exists in RAM during this session. We copy it from RAM to the on-disk bootbanks so it persists across reboots.
 
-You're at the ESXi shell prompt (looks like `[root@localhost:~]` or similar).
+## 7.0 Recovery — only if you already rebooted and got "no compatible network adapter found"
 
-## 7.0 — Background: what `/tardisks/` is and when the USB needs to be plugged in
-
-When ESXi boots, the kernel reads `boot.cfg` and **automatically copies every loaded module into a special RAM-backed directory called `/tardisks/`**. Every `.v00`, `.b00`, `.tgz` file listed in the `modules=` line ends up at `/tardisks/<filename>`.
-
-This means:
-- **`/tardisks/ifre.v00` only exists if `ifre.v00` was loaded at boot** — i.e., listed in `boot.cfg`.
-- After the install completes, the **disk-installed ESXi's `boot.cfg` doesn't list `ifre.v00`** yet (we haven't edited it). So if you reboot from disk, `/tardisks/ifre.v00` will be empty.
-- The William Lam method depends on doing the cp commands while STILL booted from the USB installer (which has the modified boot.cfg listing `ifre.v00`).
-
-**USB plug-in state during Phase 7:**
-
-| Step | USB plugged? | Why |
-|---|---|---|
-| Boot ESXi installer (Alt+F1 from welcome screen, OR finished install but pressed Alt+F1 instead of rebooting) | ✅ Yes — boot reads it | This is what populated `/tardisks/` |
-| `cp /tardisks/ifre.v00 ...` | ✅ Stays plugged (but the cp doesn't read from USB) | Source is `/tardisks/` (RAM), not USB |
-| `cp /tardisks/vmkusb_nic_fling.v00 ...` | ✅ Same | Same |
-| `vi /vmfs/volumes/BOOTBANK*/boot.cfg` | ✅ Same | Editing local SSD bootbanks, not USB |
-| Right before `reboot` | ⚠️ **YANK USB NOW** | So next boot reads the disk's bootbank, not the USB installer again |
-
-So the rule is simple: **boot from USB → keep USB plugged in for all of Phase 7 → yank USB right before reboot.**
-
-## 7.0 Recovery — if you already rebooted and got "no compatible network adapter found"
-
-Skip ahead to this if you saw the error after install completed.
-
-What happened: the install wrote ESXi to disk, but `BOOTBANK1/boot.cfg` doesn't list `ifre.v00` or `vmkusb_nic_fling.v00`. On reboot from disk, the drivers don't load. NIC is unrecognized.
-
-Fix: re-boot from the USB installer (which has the modified `boot.cfg`), get to a shell, and finish Phase 7 properly.
-
-### Recovery steps:
-
-1. **Force power off the 3rd PC** if it's hung at the no-NIC screen — hold the power button for 10 seconds.
-2. **Plug the modified USB stick** back in (the one with `ifre.v00` + `vmkusb_nic_fling.v00`).
-3. **Power on, spam F12** at Gigabyte splash → boot menu → select **USB** (NOT the SSD).
-4. Wait for the **yellow ESXi installer welcome screen** to appear.
-5. **At the welcome screen, press Alt+F1.** A login prompt appears.
-6. **Login: `root`, no password** (the installer doesn't have one set yet).
-7. You're at a shell `~ #` prompt with `/tardisks/` populated from the USB.
-8. Verify the drivers are in `/tardisks/`:
+1. Force power off (hold power button 10 sec).
+2. Plug the modified USB stick back in.
+3. Power on, spam F12 → boot menu → select USB.
+4. Wait for the yellow **ESXi installer welcome screen**.
+5. Press **Alt+F1** at the welcome screen.
+6. Login: `root` / no password (the installer-stage shell has no password).
+7. Verify:
    ```sh
    ls -la /tardisks/ifre.v00
-   ls -la /tardisks/vmkusb_nic_fling.v00
-   ```
-   Both should show files. ✅
-9. Verify the previously-installed bootbanks are visible:
-   ```sh
    ls /vmfs/volumes/
    ```
-   You should see `BOOTBANK1` and `BOOTBANK2` (these are the ESXi install on the SSD). ✅
-10. Now proceed to 7.1 below.
+   You should see `ifre.v00` in `/tardisks/`, AND `BOOTBANK1` + `BOOTBANK2` in `/vmfs/volumes/`.
+8. Continue to Phase 7.1 below.
 
-If `BOOTBANK1` and `BOOTBANK2` are NOT visible → the install was wiped or didn't complete. Re-run Phase 6 (install ESXi from USB), then Phase 7 — but **this time DO NOT REBOOT after install — press Alt+F1 instead.**
+If `BOOTBANK1` and `BOOTBANK2` are missing → the install was wiped. Re-run Phase 6, this time press Alt+F1 instead of rebooting.
 
-## 7.1 — Decide which drivers to copy
-
-Only copy the driver(s) you actually need (matches your decision in 7.3 below). Skip the section that doesn't apply.
-
-> 💡 **If unsure:** copy both. Loading an unused driver wastes a tiny bit of RAM but causes no harm. The harm comes only if you reference a driver in `boot.cfg` that doesn't exist in the bootbank — that causes a boot failure. So always copy a driver BEFORE editing `boot.cfg` to load it.
-
-### 7.1.A — Copy `ifre.v00` to both bootbanks (Realtek onboard)
-
-The source is `/tardisks/ifre.v00` (RAM-mounted, populated from the USB at boot).
+## 7.1 — Copy `ifre.v00` to both bootbanks
 
 ```sh
 cp /tardisks/ifre.v00 /vmfs/volumes/BOOTBANK1/ifre.v00
@@ -500,55 +324,24 @@ ls -la /vmfs/volumes/BOOTBANK1/ifre.v00
 ls -la /vmfs/volumes/BOOTBANK2/ifre.v00
 ```
 
-Both should show file sizes around 1,229,357 bytes (~1.2 MB).
+Both should show file size ~1,229,357 bytes (~1.2 MB).
 
-> ❌ **If you get "No such file or directory"** for `/tardisks/ifre.v00` → you're not booted from the modified USB. Go back to Section 7.0 Recovery.
+> ❌ If `cp` says **"No such file or directory"** for `/tardisks/ifre.v00` → you're not booted from the modified USB. Go back to Phase 7.0 Recovery.
 
-### 7.1.B — Copy `vmkusb_nic_fling.v00` to both bootbanks (USB-Ethernet adapter)
+## 7.2 — Add `ifre.v00` to `boot.cfg` in both bootbanks
 
-```sh
-cp /tardisks/vmkusb_nic_fling.v00 /vmfs/volumes/BOOTBANK1/vmkusb_nic_fling.v00
-cp /tardisks/vmkusb_nic_fling.v00 /vmfs/volumes/BOOTBANK2/vmkusb_nic_fling.v00
-```
-
-Verify:
-```sh
-ls -la /vmfs/volumes/BOOTBANK1/vmkusb_nic_fling.v00
-ls -la /vmfs/volumes/BOOTBANK2/vmkusb_nic_fling.v00
-```
-
-## 7.2 — Decide which modules to add
-
-You have two driver files. Add **only the ones you actually need** based on your hardware and which NIC will work after install:
-
-| Scenario | Add `ifre.v00`? | Add `vmkusb_nic_fling.v00`? |
-|---|---|---|
-| Onboard Realtek NIC works during install (rare for B360 HD3 — driver loads but doesn't bind) | ✅ Yes | ❌ No |
-| USB-Ethernet adapter is your primary NIC for the install | ❌ Optional | ✅ Yes |
-| Belt-and-suspenders — both drivers loaded so the system has options | ✅ Yes | ✅ Yes |
-
-> 💡 **Recommendation:** add only what's actually working. Loading unused drivers wastes RAM and can cause minor boot delays. If the install succeeded with just the USB-Ethernet adapter, you can add only `vmkusb_nic_fling.v00`. If you only need the onboard Realtek (and it's actually working — uncommon for Gigabyte boards), add only `ifre.v00`.
-
-The sections below give the **commands for each driver separately**. Run **only the section(s) you need**.
-
-The `modules=` line is **one extremely long line** (~1,500 characters). Editing it by hand in `vi` can be confusing — vi wraps the line visually with `@` continuation markers and may show colors/special characters that look like corruption. They aren't, but they're hard to read.
-
-**Use the `sed` one-liner instead — it's far simpler and avoids any vi confusion.**
-
----
-
-### 7.2.A — Add ONLY `ifre.v00` (Realtek onboard NIC)
-
-#### Method A — `sed` one-liner ✅ recommended
+The `modules=` line is one extremely long line (~1,500 chars). Don't try to edit it manually with `vi` — use `sed`:
 
 ```sh
 sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00|' /vmfs/volumes/BOOTBANK1/boot.cfg
 sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00|' /vmfs/volumes/BOOTBANK2/boot.cfg
 ```
 
-If `sed` runs silently (no output) → success. Skip to 7.4 verify.
+What this does: finds `imgpayld.tgz` (the second-to-last entry in the modules line) and replaces it with `imgpayld.tgz --- /ifre.v00`. Net effect: `ifre.v00` is appended at the end of the modules list.
 
-#### Method B — `awk` (fallback if `sed -i` doesn't work)
+If `sed` runs silently (no output), it succeeded.
+
+### If `sed -i` errors out — fallback with `awk`
 
 ```sh
 awk '/^modules=/ {print $0 " --- /ifre.v00"; next} {print}' /vmfs/volumes/BOOTBANK1/boot.cfg > /tmp/bc1.new
@@ -558,189 +351,71 @@ awk '/^modules=/ {print $0 " --- /ifre.v00"; next} {print}' /vmfs/volumes/BOOTBA
 cp /tmp/bc2.new /vmfs/volumes/BOOTBANK2/boot.cfg
 ```
 
-#### Method C — Manual `vi` (last resort)
+## 7.3 — Verify the edits
 
-> ⚠️ Only use this if A and B don't work. The "weird characters" you may see in vi are **normal display artifacts** (line-wrap markers `@`, syntax highlighting colors), not actual corruption.
-
-```sh
-vi /vmfs/volumes/BOOTBANK1/boot.cfg
-```
-
-In vi:
-1. Press **Esc** (make sure you're not in insert mode).
-2. Press **`7G`** to jump directly to line 7 (the `modules=` line).
-3. Press **`$`** to jump to END of that long line.
-4. Press **`a`** to enter append-after-cursor mode.
-5. Type exactly: ` --- /ifre.v00`
-6. Press **Esc**.
-7. Type `:wq` then **Enter** to save and quit.
-
-Repeat for BOOTBANK2:
-```sh
-vi /vmfs/volumes/BOOTBANK2/boot.cfg
-```
-
----
-
-### 7.2.B — Add ONLY `vmkusb_nic_fling.v00` (USB-Ethernet adapter)
-
-#### Method A — `sed` one-liner ✅ recommended
-
-```sh
-sed -i 's|imgpayld.tgz|imgpayld.tgz --- /vmkusb_nic_fling.v00|' /vmfs/volumes/BOOTBANK1/boot.cfg
-sed -i 's|imgpayld.tgz|imgpayld.tgz --- /vmkusb_nic_fling.v00|' /vmfs/volumes/BOOTBANK2/boot.cfg
-```
-
-#### Method B — `awk` (fallback)
-
-```sh
-awk '/^modules=/ {print $0 " --- /vmkusb_nic_fling.v00"; next} {print}' /vmfs/volumes/BOOTBANK1/boot.cfg > /tmp/bc1.new
-cp /tmp/bc1.new /vmfs/volumes/BOOTBANK1/boot.cfg
-
-awk '/^modules=/ {print $0 " --- /vmkusb_nic_fling.v00"; next} {print}' /vmfs/volumes/BOOTBANK2/boot.cfg > /tmp/bc2.new
-cp /tmp/bc2.new /vmfs/volumes/BOOTBANK2/boot.cfg
-```
-
-#### Method C — Manual `vi`
-
-Same procedure as 7.3.A Method C, but in step 5 type ` --- /vmkusb_nic_fling.v00` instead.
-
----
-
-### 7.2.C — Add BOTH drivers (only if your hardware uses both)
-
-#### Method A — `sed` one-liner ✅ recommended
-
-```sh
-sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00|' /vmfs/volumes/BOOTBANK1/boot.cfg
-sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00|' /vmfs/volumes/BOOTBANK2/boot.cfg
-```
-
-#### Method B — `awk` (fallback)
-
-```sh
-awk '/^modules=/ {print $0 " --- /ifre.v00 --- /vmkusb_nic_fling.v00"; next} {print}' /vmfs/volumes/BOOTBANK1/boot.cfg > /tmp/bc1.new
-cp /tmp/bc1.new /vmfs/volumes/BOOTBANK1/boot.cfg
-
-awk '/^modules=/ {print $0 " --- /ifre.v00 --- /vmkusb_nic_fling.v00"; next} {print}' /vmfs/volumes/BOOTBANK2/boot.cfg > /tmp/bc2.new
-cp /tmp/bc2.new /vmfs/volumes/BOOTBANK2/boot.cfg
-```
-
-#### Method C — Manual `vi`
-
-Same procedure as 7.3.A Method C, but in step 5 type ` --- /ifre.v00 --- /vmkusb_nic_fling.v00` instead.
-
----
-
-## 7.3 — Verify the edits succeeded
-
-Run only the checks for the drivers you added.
-
-### If you added `ifre.v00` only (7.2.A)
 ```sh
 grep -c "ifre.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
 grep -c "ifre.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
 ```
-Both should print **`1`**. If `0` → edit didn't take, try the next method.
 
-### If you added `vmkusb_nic_fling.v00` only (7.2.B)
-```sh
-grep -c "vmkusb_nic_fling.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
-grep -c "vmkusb_nic_fling.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
-```
 Both should print **`1`**.
 
-### If you added both (7.2.C)
+Visually confirm the end of the modules line:
 ```sh
-grep -c "ifre.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
-grep -c "ifre.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
-grep -c "vmkusb_nic_fling.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
-grep -c "vmkusb_nic_fling.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
-```
-All four should print **`1`**.
-
-### Visual confirmation of the modules line end
-```sh
-grep "modules=" /vmfs/volumes/BOOTBANK1/boot.cfg | tail -c 120
+grep "modules=" /vmfs/volumes/BOOTBANK1/boot.cfg | tail -c 100
 ```
 
-Expected end-of-line examples:
-| Section you ran | Expected ending |
-|---|---|
-| 7.2.A only | `... --- /imgpayld.tgz --- /ifre.v00` |
-| 7.2.B only | `... --- /imgpayld.tgz --- /vmkusb_nic_fling.v00` |
-| 7.2.C both | `... --- /imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00` |
-
-> ⚠️ **Don't run multiple sections (7.2.A + 7.2.B back-to-back)** — that would append both drivers but create duplicate entries if you re-run by mistake. If you need both drivers, use 7.2.C (one combined `sed` command).
+Should end with: `... --- /imgpayld.tgz --- /ifre.v00`
 
 ## 7.4 — Yank the USB, then reboot
 
-⚠️ **IMPORTANT:** before rebooting, **physically pull the USB stick out** of the 3rd PC. If you leave it plugged in:
-- The BIOS may try to boot from the USB again (re-launching the installer).
-- Even if it doesn't, having both the USB installer AND the disk install visible at boot can confuse ESXi.
+⚠️ **Physically pull the USB stick out** of the 3rd PC before rebooting. If you leave it plugged in, the BIOS may try to boot from USB again.
 
-After USB is unplugged, run:
+After the USB is unplugged:
 ```sh
 reboot
 ```
 
-The 3rd PC reboots from the SSD. This time `BOOTBANK1/boot.cfg` lists both drivers → they load → USB-Ethernet adapter recognized → ESXi shows IP at the splash.
+The 3rd PC reboots from the SSD. This time `BOOTBANK1/boot.cfg` lists `ifre.v00`, so it loads at boot, and the Realtek driver initializes the onboard NIC.
 
 ---
 
 # Phase 8 — Verify and configure network (10 min)
 
-## 8.1 — First boot from disk
+## 8.1 — Check the splash
 
-ESXi boots from the local SSD (no USB needed anymore — you can yank it during the BIOS splash).
-
-The yellow/grey ESXi splash should show:
+After reboot, the yellow/grey ESXi splash should show:
 ```
 https://192.168.x.x/
 ```
 
-at the top. If you see `0.0.0.0` → the NIC didn't initialize. Check:
-- USB-Ethernet adapter still plugged in to the USB 3.0 port?
-- Network cable connected on the other side?
-- Router/switch powered on and providing DHCP?
+at the top.
+
+| Result | Meaning |
+|---|---|
+| `https://192.168.x.x/` shown | ✅ Driver bound to your NIC. Proceed to 8.2. |
+| `0.0.0.0` shown | NIC didn't get DHCP. Check cable + router. Try F2 → Configure Management Network → Restart Network. |
+| `No compatible network adapter found` | ❌ Driver loaded but didn't bind to your NIC's specific subsystem ID (the SUBSYS_E0001458 issue). Move to **Appendix A** to add a USB-Ethernet adapter, OR plan to buy an Intel I210-T1 PCIe NIC. |
 
 ## 8.2 — Set static IP (recommended)
 
-Press **F2** at the ESXi splash → log in as `root` / your password.
+Press **F2** at the ESXi splash → log in as `root`.
 
-Navigate:
-1. **Configure Management Network → Network Adapters** → confirm one vmnic is selected (it'll be the USB adapter, e.g., `vmnic32`).
+1. **Configure Management Network → Network Adapters** → confirm a vmnic is selected.
 2. **IPv4 Configuration** → Set static IPv4 address:
    - IP: `192.168.1.1` (or whatever the MA2 PDF specified)
    - Mask: `255.255.255.0`
    - Gateway: your router's IP
 3. **DNS Configuration:** primary `8.8.8.8`, hostname `esxi-team1`.
-4. Press **Esc** → **Y** to apply.
+4. **Esc** → **Y** to apply.
 
-## 8.3 — Test from PC1 browser
+## 8.3 — Test from PC1
 
-From PC1 (your build PC):
-- Browser → `https://192.168.1.1/` (or whatever IP)
+From PC1's browser:
+- `https://<ESXi-IP>/ui`
 - Cert warning expected → **Advanced → Proceed (unsafe)**.
-- Login: `root` / your password.
-- ESXi web UI loads. ✅ **bare-metal ESXi installation complete.**
-
-## 8.4 — (Optional) Add the onboard Realtek NIC's SUBSYS to the driver claim list
-
-Now that ESXi is running, you can manually tell the Realtek driver to claim your onboard NIC's specific subsystem ID. From the web UI → enable SSH (Manage → Services → TSM-SSH → Start), then SSH from PC1:
-
-```sh
-ssh root@192.168.1.1
-```
-
-Run:
-```sh
-esxcli system module parameters set -m if-re -p "PCI_DEV_TBL_OVR=10ec:8168:1458:e000"
-/sbin/auto-backup.sh
-reboot
-```
-
-After reboot, the onboard Realtek may now also be detected as a second `vmnic`. Bonus — but not required for ESXi to function.
+- Login: `root` / your install password.
+- ESXi web UI loads. ✅ **Bare-metal ESXi is up.**
 
 ---
 
@@ -748,33 +423,104 @@ After reboot, the onboard Realtek may now also be detected as a second `vmnic`. 
 
 | Symptom | Fix |
 |---|---|
-| Boot text shows "Unable to load module: ifre.v00" | The file isn't on the USB root. Re-do Phase 4.4. |
-| "No network adapters" with both drivers loaded | USB-Ethernet adapter is using an unsupported chip. Try a different one (AX88179 or RTL8153 are the safest). |
-| `cp` to BOOTBANK fails: "permission denied" | You're not root. Type `whoami` to confirm. Re-login as root. |
-| `vi` edit doesn't save | You forgot to press Esc before `:wq`. Re-open file. |
-| ESXi boots but NIC is `vmnic32` instead of `vmnic0` | This is **normal** for USB NICs — they always get high vmnic numbers. Web UI works fine. |
-| Web UI not reachable from PC1 | Confirm ESXi static IP is on the same subnet as PC1. Check cables. Disable Windows firewall on PC1 temporarily to rule it out. |
-| Realtek SUBSYS injection (Step 8.4) doesn't bind onboard NIC | Some Gigabyte Dragon variants need a different parameter. Skip — keep using USB adapter. The Intel I210-T1 NIC is the cleanest fix when it arrives. |
-
----
-
-# Summary — what you have when this is done
-
-✅ Bare-metal ESXi 8.0U3 installed on the 3rd PC (Gigabyte B360 HD3)
-✅ Network connectivity via supported USB-Ethernet adapter (or Intel PCIe card)
-✅ ESXi web UI accessible from PC1 browser at `https://192.168.1.1/`
-✅ Ready to create port groups (Phase B of `02_Setup_Topology.md`) and build practice VMs
+| Boot text shows "Unable to load module: ifre.v00" | File not on USB. Re-do Phase 4.4. |
+| ESXi installer says "No Network Adapters" | Driver loaded but didn't bind to your NIC. Likely SUBSYS mismatch. See **Appendix A** or buy Intel NIC. |
+| `cp /tardisks/ifre.v00 ...` says "No such file or directory" | Not booted from modified USB. See Phase 7.0 Recovery. |
+| `sed -i` errors out | Use the `awk` fallback in 7.2. |
+| `grep -c` returns 0 | Edit didn't take. Try the `awk` fallback. |
+| First reboot from disk: "no compatible network adapter found" | Driver was loaded at install but is missing from the bootbanks. See Phase 7.0 Recovery. |
+| ESXi web UI not reachable from PC1 | Confirm both are on same subnet. Disable Windows Firewall on PC1 temporarily to rule it out. |
 
 ---
 
 # Next steps
 
-Once ESXi is up:
+After ESXi is up:
 1. Return to **`02_Setup_Topology.md` Section B** to create the 5 port groups (PG-Internet, PG-LAN, PG-DMZ, PG-Servers, PG-MA1-CMS).
 2. Then **`03_Setup_VMs_MA1.md`** to build the CMS pentest target + Kali.
 3. Then **`04_Setup_VMs_MA2.md`** to build the manila.com environment.
 
-You're back on track for practice.
+---
+
+---
+
+# Appendix A — Optional: USB-Ethernet adapter fallback
+
+**Use this only if the Realtek-only path failed** (Phase 8.1 showed "No compatible network adapter found"). This appendix adds the **USB Network Native Driver Fling** alongside `ifre.v00` so a USB-Ethernet adapter can serve as the working NIC.
+
+## A.1 — Buy a supported USB-Ethernet adapter
+
+Required chip: **ASIX AX88179** or **Realtek RTL8153**. Both work with the USB Network Native Driver Fling. ~₱300–500 from Lazada/Shopee, often same-day Manila delivery.
+
+## A.2 — Download the USB Network Native Driver Fling
+
+1. Broadcom Flings: `https://support.broadcom.com/group/ecx/productdownloads?subfamily=Flings&freeDownloads=true`
+2. Find **USB Network Native Driver for ESXi** (compatible with ESXi 8.0).
+3. Download the offline bundle ZIP. Filename like:
+   ```
+   ESXi800-VMKUSB-NIC-FLING-xxxxx-component.zip
+   ```
+4. Save to `D:\esxi-build\`.
+
+## A.3 — Extract `vmkusb_nic_fling.v00`
+
+```powershell
+cd D:\esxi-build
+& "C:\Program Files\7-Zip\7z.exe" e .\ESXi800-VMKUSB-NIC-FLING-*.zip
+& "C:\Program Files\7-Zip\7z.exe" e .\vmw_bootbank_vmkusb-nic-fling_*.vib
+
+# Find the driver payload (largest non-.vib non-.zip file)
+Get-ChildItem -File | Where-Object { $_.Name -notmatch '\.(vib|zip|iso|xml|pkcs7|txt)$' } | Sort-Object Length -Descending | Select-Object Name, Length -First 5
+
+# Rename whatever the largest payload is — substitute its actual filename:
+Rename-Item ".\<long-filename>" "vmkusb_nic_fling.v00"
+```
+
+Expected size: ~600 KB to 1.5 MB.
+
+## A.4 — Add to USB
+
+Plug the same USB stick into PC1. Then:
+
+```powershell
+$usb = "E:\"   # adjust to your USB drive letter
+Copy-Item D:\esxi-build\vmkusb_nic_fling.v00 "$usb\vmkusb_nic_fling.v00"
+Copy-Item D:\esxi-build\vmkusb_nic_fling.v00 "$usb\efi\boot\vmkusb_nic_fling.v00"
+```
+
+Edit BOTH `boot.cfg` files on the USB (root and `efi\boot\`) — append a second module:
+```
+... --- /imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00
+```
+
+Save with Notepad++.
+
+## A.5 — Plug in the USB-Ethernet adapter
+
+Plug it into a USB 3.0 port (blue inside) on the 3rd PC.
+
+## A.6 — Reinstall ESXi from the updated USB
+
+Repeat Phases 5–7, but with both drivers active. In Phase 7.1, also copy the second driver:
+
+```sh
+cp /tardisks/vmkusb_nic_fling.v00 /vmfs/volumes/BOOTBANK1/vmkusb_nic_fling.v00
+cp /tardisks/vmkusb_nic_fling.v00 /vmfs/volumes/BOOTBANK2/vmkusb_nic_fling.v00
+```
+
+In Phase 7.2, use the combined sed:
+```sh
+sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00|' /vmfs/volumes/BOOTBANK1/boot.cfg
+sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00|' /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+In Phase 7.3, also verify `vmkusb_nic_fling.v00`:
+```sh
+grep -c "vmkusb_nic_fling.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
+grep -c "vmkusb_nic_fling.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+After reboot, ESXi will use the USB-Ethernet adapter as its primary NIC (typically `vmnic32` — USB NICs get high vmnic numbers).
 
 ---
 
