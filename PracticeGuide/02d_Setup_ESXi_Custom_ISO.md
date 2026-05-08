@@ -117,22 +117,40 @@ Compressed: ~85000
 Everything is Ok
 ```
 
-Now `D:\esxi-build\` contains 3 new files:
-- `descriptor.xml`  (~2 KB — the metadata)
-- `sig.pkcs7`  (~5 KB — the signature)
-- `if-re`  (~50–200 KB — **the driver payload we need**)
+Now `D:\esxi-build\` contains additional files. The exact set varies slightly by 7-Zip version + Fling version — there are **two common patterns** you might see:
 
-Verify they all appeared:
+**Pattern X (most common with Realtek Fling 1.101.01):**
+- `vmw_bootbank_if-re_1.101.01-5vmw.800.1.0.20613240`  (~1.2 MB, no extension — **this is the driver payload**)
+- `vmw_bootbank_if-re_1.101.01-5vmw.800.1.0.20613240.vib`  (~226 KB — original .vib, kept by 7-Zip)
+- `VMware-Re-Driver_1.101.01-...zip`  (~210 KB — original Fling zip)
+- `metadata.zip`  (~3 KB — metadata extracted alongside)
+
+**Pattern Y (older 7-Zip versions / older Flings):**
+- `descriptor.xml`  (~2 KB)
+- `sig.pkcs7`  (~5 KB)
+- `if-re`  (~50–200 KB — driver payload)
+
+In both cases, **the file we want is the largest "if-re" or `vmw_bootbank_if-re_*` (no extension) entry** — that's the renamed Realtek driver.
+
+Verify what 7-Zip produced:
 ```powershell
-Get-ChildItem -File | Sort-Object Length -Descending | Select-Object Name, Length -First 5
+Get-ChildItem -File | Sort-Object Length -Descending | Select-Object Name, Length -First 6
 ```
 
-You should see `if-re` as the largest of the new files. Then rename it:
+Identify the largest file with **`if-re`** in its name (could be ~200 KB up to ~1.5 MB depending on Fling version — **size doesn't matter, exact name does**).
+
+Then rename it to `ifre.v00`:
 ```powershell
+# If you got Pattern X (long filename, no extension):
+Rename-Item ".\vmw_bootbank_if-re_1.101.01-5vmw.800.1.0.20613240" "ifre.v00"
+
+# If you got Pattern Y (short filename "if-re"):
 Rename-Item ".\if-re" "ifre.v00"
 ```
 
-Verify:
+> ⚠️ **7-Zip naming quirk:** when 7-Zip's command-line extracts an `ar` archive, it sometimes preserves the `.vib`'s long internal filename as the extracted file's name (Pattern X above). Other times it uses the short member name (`if-re` — Pattern Y). Both are the **same file content** — just different naming conventions. Either way, you want to rename it to `ifre.v00`.
+
+Verify the rename:
 ```powershell
 Get-Item .\ifre.v00 | Format-List Name, Length
 ```
@@ -140,10 +158,18 @@ Get-Item .\ifre.v00 | Format-List Name, Length
 Expected:
 ```
 Name   : ifre.v00
-Length : 87042   (or similar, between ~50,000 and ~250,000)
+Length : 1229357   (or anywhere from ~50,000 to ~1,500,000 depending on Fling version)
 ```
 
-If `Length` is much bigger than 250 KB or much smaller than 50 KB → wrong file. Re-extract.
+> 📏 **About the file size:** the older Realtek community VIBs were ~50–250 KB. The newer Broadcom Realtek Fling 1.101.01 is **~1.2 MB** because it includes drivers for 4 chip families (RTL8111/8125/8126/8127). **Don't worry if your size is "too big" vs older sizes documented elsewhere on the internet — 1.2 MB is correct for v1.101.01.**
+
+#### Optional cleanup
+You can delete the leftover scaffolding files (the original .vib, the metadata.zip, the original Fling .zip) — they're not used from here on. But it's safer to **keep them** in case you need to re-extract later. Disk space is cheap.
+
+```powershell
+# Optional cleanup of just the small leftovers (NOT the .vib or .zip — keep those):
+Remove-Item .\metadata.zip -ErrorAction SilentlyContinue
+```
 
 ### Method B — WSL with `ar` (fallback if 7-Zip command-line fails)
 
