@@ -479,7 +479,13 @@ Fix: re-boot from the USB installer (which has the modified `boot.cfg`), get to 
 
 If `BOOTBANK1` and `BOOTBANK2` are NOT visible → the install was wiped or didn't complete. Re-run Phase 6 (install ESXi from USB), then Phase 7 — but **this time DO NOT REBOOT after install — press Alt+F1 instead.**
 
-## 7.1 — Copy `ifre.v00` to both bootbanks
+## 7.1 — Decide which drivers to copy
+
+Only copy the driver(s) you actually need (matches your decision in 7.3 below). Skip the section that doesn't apply.
+
+> 💡 **If unsure:** copy both. Loading an unused driver wastes a tiny bit of RAM but causes no harm. The harm comes only if you reference a driver in `boot.cfg` that doesn't exist in the bootbank — that causes a boot failure. So always copy a driver BEFORE editing `boot.cfg` to load it.
+
+### 7.1.A — Copy `ifre.v00` to both bootbanks (Realtek onboard)
 
 The source is `/tardisks/ifre.v00` (RAM-mounted, populated from the USB at boot).
 
@@ -498,7 +504,7 @@ Both should show file sizes around 1,229,357 bytes (~1.2 MB).
 
 > ❌ **If you get "No such file or directory"** for `/tardisks/ifre.v00` → you're not booted from the modified USB. Go back to Section 7.0 Recovery.
 
-## 7.2 — Copy `vmkusb_nic_fling.v00` to both bootbanks
+### 7.1.B — Copy `vmkusb_nic_fling.v00` to both bootbanks (USB-Ethernet adapter)
 
 ```sh
 cp /tardisks/vmkusb_nic_fling.v00 /vmfs/volumes/BOOTBANK1/vmkusb_nic_fling.v00
@@ -511,28 +517,106 @@ ls -la /vmfs/volumes/BOOTBANK1/vmkusb_nic_fling.v00
 ls -la /vmfs/volumes/BOOTBANK2/vmkusb_nic_fling.v00
 ```
 
-## 7.3 — Append the new modules to BOTH boot.cfg files
+## 7.2 — Decide which modules to add
 
-You need to append ` --- /ifre.v00 --- /vmkusb_nic_fling.v00` to the `modules=` line in both `/vmfs/volumes/BOOTBANK1/boot.cfg` and `/vmfs/volumes/BOOTBANK2/boot.cfg`.
+You have two driver files. Add **only the ones you actually need** based on your hardware and which NIC will work after install:
+
+| Scenario | Add `ifre.v00`? | Add `vmkusb_nic_fling.v00`? |
+|---|---|---|
+| Onboard Realtek NIC works during install (rare for B360 HD3 — driver loads but doesn't bind) | ✅ Yes | ❌ No |
+| USB-Ethernet adapter is your primary NIC for the install | ❌ Optional | ✅ Yes |
+| Belt-and-suspenders — both drivers loaded so the system has options | ✅ Yes | ✅ Yes |
+
+> 💡 **Recommendation:** add only what's actually working. Loading unused drivers wastes RAM and can cause minor boot delays. If the install succeeded with just the USB-Ethernet adapter, you can add only `vmkusb_nic_fling.v00`. If you only need the onboard Realtek (and it's actually working — uncommon for Gigabyte boards), add only `ifre.v00`.
+
+The sections below give the **commands for each driver separately**. Run **only the section(s) you need**.
 
 The `modules=` line is **one extremely long line** (~1,500 characters). Editing it by hand in `vi` can be confusing — vi wraps the line visually with `@` continuation markers and may show colors/special characters that look like corruption. They aren't, but they're hard to read.
 
 **Use the `sed` one-liner instead — it's far simpler and avoids any vi confusion.**
 
-### Method A — `sed` one-liner ✅ recommended (use this first)
+---
+
+### 7.2.A — Add ONLY `ifre.v00` (Realtek onboard NIC)
+
+#### Method A — `sed` one-liner ✅ recommended
+
+```sh
+sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00|' /vmfs/volumes/BOOTBANK1/boot.cfg
+sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00|' /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+If `sed` runs silently (no output) → success. Skip to 7.4 verify.
+
+#### Method B — `awk` (fallback if `sed -i` doesn't work)
+
+```sh
+awk '/^modules=/ {print $0 " --- /ifre.v00"; next} {print}' /vmfs/volumes/BOOTBANK1/boot.cfg > /tmp/bc1.new
+cp /tmp/bc1.new /vmfs/volumes/BOOTBANK1/boot.cfg
+
+awk '/^modules=/ {print $0 " --- /ifre.v00"; next} {print}' /vmfs/volumes/BOOTBANK2/boot.cfg > /tmp/bc2.new
+cp /tmp/bc2.new /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+#### Method C — Manual `vi` (last resort)
+
+> ⚠️ Only use this if A and B don't work. The "weird characters" you may see in vi are **normal display artifacts** (line-wrap markers `@`, syntax highlighting colors), not actual corruption.
+
+```sh
+vi /vmfs/volumes/BOOTBANK1/boot.cfg
+```
+
+In vi:
+1. Press **Esc** (make sure you're not in insert mode).
+2. Press **`7G`** to jump directly to line 7 (the `modules=` line).
+3. Press **`$`** to jump to END of that long line.
+4. Press **`a`** to enter append-after-cursor mode.
+5. Type exactly: ` --- /ifre.v00`
+6. Press **Esc**.
+7. Type `:wq` then **Enter** to save and quit.
+
+Repeat for BOOTBANK2:
+```sh
+vi /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+---
+
+### 7.2.B — Add ONLY `vmkusb_nic_fling.v00` (USB-Ethernet adapter)
+
+#### Method A — `sed` one-liner ✅ recommended
+
+```sh
+sed -i 's|imgpayld.tgz|imgpayld.tgz --- /vmkusb_nic_fling.v00|' /vmfs/volumes/BOOTBANK1/boot.cfg
+sed -i 's|imgpayld.tgz|imgpayld.tgz --- /vmkusb_nic_fling.v00|' /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+#### Method B — `awk` (fallback)
+
+```sh
+awk '/^modules=/ {print $0 " --- /vmkusb_nic_fling.v00"; next} {print}' /vmfs/volumes/BOOTBANK1/boot.cfg > /tmp/bc1.new
+cp /tmp/bc1.new /vmfs/volumes/BOOTBANK1/boot.cfg
+
+awk '/^modules=/ {print $0 " --- /vmkusb_nic_fling.v00"; next} {print}' /vmfs/volumes/BOOTBANK2/boot.cfg > /tmp/bc2.new
+cp /tmp/bc2.new /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+#### Method C — Manual `vi`
+
+Same procedure as 7.3.A Method C, but in step 5 type ` --- /vmkusb_nic_fling.v00` instead.
+
+---
+
+### 7.2.C — Add BOTH drivers (only if your hardware uses both)
+
+#### Method A — `sed` one-liner ✅ recommended
 
 ```sh
 sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00|' /vmfs/volumes/BOOTBANK1/boot.cfg
 sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00|' /vmfs/volumes/BOOTBANK2/boot.cfg
 ```
 
-**What this does:** finds `imgpayld.tgz` (the second-to-last module in the line) and replaces it with `imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00`. Net effect: appends both new modules right after `imgpayld.tgz` at the end of the modules list.
-
-If `sed` runs silently (no output) → it worked. Skip ahead to 7.4 verify.
-
-### Method B — `awk` (use if Method A doesn't work or shows error)
-
-ESXi's `sed` sometimes lacks `-i` (in-place). If Method A errors out, use this `awk` approach:
+#### Method B — `awk` (fallback)
 
 ```sh
 awk '/^modules=/ {print $0 " --- /ifre.v00 --- /vmkusb_nic_fling.v00"; next} {print}' /vmfs/volumes/BOOTBANK1/boot.cfg > /tmp/bc1.new
@@ -542,53 +626,54 @@ awk '/^modules=/ {print $0 " --- /ifre.v00 --- /vmkusb_nic_fling.v00"; next} {pr
 cp /tmp/bc2.new /vmfs/volumes/BOOTBANK2/boot.cfg
 ```
 
-This finds the line starting with `modules=`, appends the new modules, and rewrites the file.
+#### Method C — Manual `vi`
 
-### Method C — Manual `vi` (last resort if Methods A and B both fail)
+Same procedure as 7.3.A Method C, but in step 5 type ` --- /ifre.v00 --- /vmkusb_nic_fling.v00` instead.
 
-> ⚠️ Only use this if A and B don't work. The "weird characters" you may see in vi are **normal display artifacts** (line-wrap markers `@`, syntax highlighting colors), not actual corruption.
+---
 
+## 7.3 — Verify the edits succeeded
+
+Run only the checks for the drivers you added.
+
+### If you added `ifre.v00` only (7.2.A)
 ```sh
-vi /vmfs/volumes/BOOTBANK1/boot.cfg
+grep -c "ifre.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
+grep -c "ifre.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
 ```
+Both should print **`1`**. If `0` → edit didn't take, try the next method.
 
-In `vi`:
-1. Press **Esc** to make sure you're not already in insert mode.
-2. Press **`7G`** to jump directly to line 7 (the `modules=` line is always line 7 in ESXi boot.cfg).
-3. Press **`$`** to jump to the END of that long line.
-4. Press **`a`** to enter append-after-cursor mode (status line shows `-- INSERT --`).
-5. Type exactly: ` --- /ifre.v00 --- /vmkusb_nic_fling.v00` (note: leading space, then `---`).
-6. Press **Esc** to exit Insert mode.
-7. Type `:wq` then press **Enter** to save and quit.
-
-If you make a mistake: press **Esc**, type `:q!`, press Enter to quit without saving. Re-run the `vi` command and try again.
-
-Repeat for BOOTBANK2:
+### If you added `vmkusb_nic_fling.v00` only (7.2.B)
 ```sh
-vi /vmfs/volumes/BOOTBANK2/boot.cfg
+grep -c "vmkusb_nic_fling.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
+grep -c "vmkusb_nic_fling.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
 ```
+Both should print **`1`**.
 
-## 7.4 — Verify both edits succeeded
-
-Whichever method you used, run this to confirm:
-
+### If you added both (7.2.C)
 ```sh
 grep -c "ifre.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
 grep -c "ifre.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
 grep -c "vmkusb_nic_fling.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
 grep -c "vmkusb_nic_fling.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
 ```
+All four should print **`1`**.
 
-Each should print **`1`** (one occurrence — appended to the modules line). If any prints `0`, the edit didn't take — try the next method (A → B → C).
-
-You can also visually verify the end of the modules line:
+### Visual confirmation of the modules line end
 ```sh
-grep "modules=" /vmfs/volumes/BOOTBANK1/boot.cfg | tail -c 100
+grep "modules=" /vmfs/volumes/BOOTBANK1/boot.cfg | tail -c 120
 ```
 
-Should show something like `... --- /imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00`.
+Expected end-of-line examples:
+| Section you ran | Expected ending |
+|---|---|
+| 7.2.A only | `... --- /imgpayld.tgz --- /ifre.v00` |
+| 7.2.B only | `... --- /imgpayld.tgz --- /vmkusb_nic_fling.v00` |
+| 7.2.C both | `... --- /imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00` |
 
-## 7.5 — Yank the USB, then reboot
+> ⚠️ **Don't run multiple sections (7.2.A + 7.2.B back-to-back)** — that would append both drivers but create duplicate entries if you re-run by mistake. If you need both drivers, use 7.2.C (one combined `sed` command).
+
+## 7.4 — Yank the USB, then reboot
 
 ⚠️ **IMPORTANT:** before rebooting, **physically pull the USB stick out** of the 3rd PC. If you leave it plugged in:
 - The BIOS may try to boot from the USB again (re-launching the installer).
