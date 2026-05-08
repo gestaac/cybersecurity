@@ -422,9 +422,66 @@ You're now at the ESXi shell.
 
 # Phase 7 — Post-install: copy drivers + edit boot.cfg (10 min)
 
+> ⚠️ **CRITICAL:** if you already rebooted from disk (got "no compatible network adapter found"), see **Section 7.0 Recovery** below before doing anything else.
+
 You're at the ESXi shell prompt (looks like `[root@localhost:~]` or similar).
 
+## 7.0 — Background: what `/tardisks/` is and when the USB needs to be plugged in
+
+When ESXi boots, the kernel reads `boot.cfg` and **automatically copies every loaded module into a special RAM-backed directory called `/tardisks/`**. Every `.v00`, `.b00`, `.tgz` file listed in the `modules=` line ends up at `/tardisks/<filename>`.
+
+This means:
+- **`/tardisks/ifre.v00` only exists if `ifre.v00` was loaded at boot** — i.e., listed in `boot.cfg`.
+- After the install completes, the **disk-installed ESXi's `boot.cfg` doesn't list `ifre.v00`** yet (we haven't edited it). So if you reboot from disk, `/tardisks/ifre.v00` will be empty.
+- The William Lam method depends on doing the cp commands while STILL booted from the USB installer (which has the modified boot.cfg listing `ifre.v00`).
+
+**USB plug-in state during Phase 7:**
+
+| Step | USB plugged? | Why |
+|---|---|---|
+| Boot ESXi installer (Alt+F1 from welcome screen, OR finished install but pressed Alt+F1 instead of rebooting) | ✅ Yes — boot reads it | This is what populated `/tardisks/` |
+| `cp /tardisks/ifre.v00 ...` | ✅ Stays plugged (but the cp doesn't read from USB) | Source is `/tardisks/` (RAM), not USB |
+| `cp /tardisks/vmkusb_nic_fling.v00 ...` | ✅ Same | Same |
+| `vi /vmfs/volumes/BOOTBANK*/boot.cfg` | ✅ Same | Editing local SSD bootbanks, not USB |
+| Right before `reboot` | ⚠️ **YANK USB NOW** | So next boot reads the disk's bootbank, not the USB installer again |
+
+So the rule is simple: **boot from USB → keep USB plugged in for all of Phase 7 → yank USB right before reboot.**
+
+## 7.0 Recovery — if you already rebooted and got "no compatible network adapter found"
+
+Skip ahead to this if you saw the error after install completed.
+
+What happened: the install wrote ESXi to disk, but `BOOTBANK1/boot.cfg` doesn't list `ifre.v00` or `vmkusb_nic_fling.v00`. On reboot from disk, the drivers don't load. NIC is unrecognized.
+
+Fix: re-boot from the USB installer (which has the modified `boot.cfg`), get to a shell, and finish Phase 7 properly.
+
+### Recovery steps:
+
+1. **Force power off the 3rd PC** if it's hung at the no-NIC screen — hold the power button for 10 seconds.
+2. **Plug the modified USB stick** back in (the one with `ifre.v00` + `vmkusb_nic_fling.v00`).
+3. **Power on, spam F12** at Gigabyte splash → boot menu → select **USB** (NOT the SSD).
+4. Wait for the **yellow ESXi installer welcome screen** to appear.
+5. **At the welcome screen, press Alt+F1.** A login prompt appears.
+6. **Login: `root`, no password** (the installer doesn't have one set yet).
+7. You're at a shell `~ #` prompt with `/tardisks/` populated from the USB.
+8. Verify the drivers are in `/tardisks/`:
+   ```sh
+   ls -la /tardisks/ifre.v00
+   ls -la /tardisks/vmkusb_nic_fling.v00
+   ```
+   Both should show files. ✅
+9. Verify the previously-installed bootbanks are visible:
+   ```sh
+   ls /vmfs/volumes/
+   ```
+   You should see `BOOTBANK1` and `BOOTBANK2` (these are the ESXi install on the SSD). ✅
+10. Now proceed to 7.1 below.
+
+If `BOOTBANK1` and `BOOTBANK2` are NOT visible → the install was wiped or didn't complete. Re-run Phase 6 (install ESXi from USB), then Phase 7 — but **this time DO NOT REBOOT after install — press Alt+F1 instead.**
+
 ## 7.1 — Copy `ifre.v00` to both bootbanks
+
+The source is `/tardisks/ifre.v00` (RAM-mounted, populated from the USB at boot).
 
 ```sh
 cp /tardisks/ifre.v00 /vmfs/volumes/BOOTBANK1/ifre.v00
@@ -437,7 +494,9 @@ ls -la /vmfs/volumes/BOOTBANK1/ifre.v00
 ls -la /vmfs/volumes/BOOTBANK2/ifre.v00
 ```
 
-Both should show file sizes around 1,229,357 bytes.
+Both should show file sizes around 1,229,357 bytes (~1.2 MB).
+
+> ❌ **If you get "No such file or directory"** for `/tardisks/ifre.v00` → you're not booted from the modified USB. Go back to Section 7.0 Recovery.
 
 ## 7.2 — Copy `vmkusb_nic_fling.v00` to both bootbanks
 
@@ -446,33 +505,101 @@ cp /tardisks/vmkusb_nic_fling.v00 /vmfs/volumes/BOOTBANK1/vmkusb_nic_fling.v00
 cp /tardisks/vmkusb_nic_fling.v00 /vmfs/volumes/BOOTBANK2/vmkusb_nic_fling.v00
 ```
 
-## 7.3 — Edit `/vmfs/volumes/BOOTBANK1/boot.cfg`
+Verify:
+```sh
+ls -la /vmfs/volumes/BOOTBANK1/vmkusb_nic_fling.v00
+ls -la /vmfs/volumes/BOOTBANK2/vmkusb_nic_fling.v00
+```
+
+## 7.3 — Append the new modules to BOTH boot.cfg files
+
+You need to append ` --- /ifre.v00 --- /vmkusb_nic_fling.v00` to the `modules=` line in both `/vmfs/volumes/BOOTBANK1/boot.cfg` and `/vmfs/volumes/BOOTBANK2/boot.cfg`.
+
+The `modules=` line is **one extremely long line** (~1,500 characters). Editing it by hand in `vi` can be confusing — vi wraps the line visually with `@` continuation markers and may show colors/special characters that look like corruption. They aren't, but they're hard to read.
+
+**Use the `sed` one-liner instead — it's far simpler and avoids any vi confusion.**
+
+### Method A — `sed` one-liner ✅ recommended (use this first)
+
+```sh
+sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00|' /vmfs/volumes/BOOTBANK1/boot.cfg
+sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00|' /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+**What this does:** finds `imgpayld.tgz` (the second-to-last module in the line) and replaces it with `imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00`. Net effect: appends both new modules right after `imgpayld.tgz` at the end of the modules list.
+
+If `sed` runs silently (no output) → it worked. Skip ahead to 7.4 verify.
+
+### Method B — `awk` (use if Method A doesn't work or shows error)
+
+ESXi's `sed` sometimes lacks `-i` (in-place). If Method A errors out, use this `awk` approach:
+
+```sh
+awk '/^modules=/ {print $0 " --- /ifre.v00 --- /vmkusb_nic_fling.v00"; next} {print}' /vmfs/volumes/BOOTBANK1/boot.cfg > /tmp/bc1.new
+cp /tmp/bc1.new /vmfs/volumes/BOOTBANK1/boot.cfg
+
+awk '/^modules=/ {print $0 " --- /ifre.v00 --- /vmkusb_nic_fling.v00"; next} {print}' /vmfs/volumes/BOOTBANK2/boot.cfg > /tmp/bc2.new
+cp /tmp/bc2.new /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+This finds the line starting with `modules=`, appends the new modules, and rewrites the file.
+
+### Method C — Manual `vi` (last resort if Methods A and B both fail)
+
+> ⚠️ Only use this if A and B don't work. The "weird characters" you may see in vi are **normal display artifacts** (line-wrap markers `@`, syntax highlighting colors), not actual corruption.
 
 ```sh
 vi /vmfs/volumes/BOOTBANK1/boot.cfg
 ```
 
 In `vi`:
-1. Press `i` to enter Insert mode.
-2. Use arrow keys to navigate to the end of the `modules=` line (it's one very long line).
-3. Append: ` --- /ifre.v00 --- /vmkusb_nic_fling.v00`
-4. Press **Esc** to exit Insert mode.
-5. Type `:wq` then press **Enter** to save and quit.
+1. Press **Esc** to make sure you're not already in insert mode.
+2. Press **`7G`** to jump directly to line 7 (the `modules=` line is always line 7 in ESXi boot.cfg).
+3. Press **`$`** to jump to the END of that long line.
+4. Press **`a`** to enter append-after-cursor mode (status line shows `-- INSERT --`).
+5. Type exactly: ` --- /ifre.v00 --- /vmkusb_nic_fling.v00` (note: leading space, then `---`).
+6. Press **Esc** to exit Insert mode.
+7. Type `:wq` then press **Enter** to save and quit.
 
-## 7.4 — Edit `/vmfs/volumes/BOOTBANK2/boot.cfg`
+If you make a mistake: press **Esc**, type `:q!`, press Enter to quit without saving. Re-run the `vi` command and try again.
 
-Repeat:
+Repeat for BOOTBANK2:
 ```sh
 vi /vmfs/volumes/BOOTBANK2/boot.cfg
 ```
 
-Same edit. Save with `:wq`.
+## 7.4 — Verify both edits succeeded
 
-## 7.5 — Reboot
+Whichever method you used, run this to confirm:
 
+```sh
+grep -c "ifre.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
+grep -c "ifre.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
+grep -c "vmkusb_nic_fling.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
+grep -c "vmkusb_nic_fling.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+Each should print **`1`** (one occurrence — appended to the modules line). If any prints `0`, the edit didn't take — try the next method (A → B → C).
+
+You can also visually verify the end of the modules line:
+```sh
+grep "modules=" /vmfs/volumes/BOOTBANK1/boot.cfg | tail -c 100
+```
+
+Should show something like `... --- /imgpayld.tgz --- /ifre.v00 --- /vmkusb_nic_fling.v00`.
+
+## 7.5 — Yank the USB, then reboot
+
+⚠️ **IMPORTANT:** before rebooting, **physically pull the USB stick out** of the 3rd PC. If you leave it plugged in:
+- The BIOS may try to boot from the USB again (re-launching the installer).
+- Even if it doesn't, having both the USB installer AND the disk install visible at boot can confuse ESXi.
+
+After USB is unplugged, run:
 ```sh
 reboot
 ```
+
+The 3rd PC reboots from the SSD. This time `BOOTBANK1/boot.cfg` lists both drivers → they load → USB-Ethernet adapter recognized → ESXi shows IP at the splash.
 
 ---
 
