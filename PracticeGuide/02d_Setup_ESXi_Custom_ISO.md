@@ -330,18 +330,13 @@ Both should show file size ~1,229,357 bytes (~1.2 MB).
 
 ## 7.2 — Add `ifre.v00` to `boot.cfg` in both bootbanks
 
-The `modules=` line is one extremely long line (~1,500 chars). Don't try to edit it manually with `vi` — use `sed`:
+The `modules=` line is one extremely long line (~1,500 chars). Don't try to edit it manually with `vi` — use one of the methods below.
 
-```sh
-sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00|' /vmfs/volumes/BOOTBANK1/boot.cfg
-sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00|' /vmfs/volumes/BOOTBANK2/boot.cfg
-```
+> ⚠️ **Use Method A first.** Method B (`sed -i`) often fails silently on ESXi's busybox shell — the command appears to run but the file doesn't change. If you suspect that happened, run the verification step (7.3) — if `grep -c` returns `0`, switch to Method A.
 
-What this does: finds `imgpayld.tgz` (the second-to-last entry in the modules line) and replaces it with `imgpayld.tgz --- /ifre.v00`. Net effect: `ifre.v00` is appended at the end of the modules list.
+### Method A — `awk` ✅ recommended (most reliable on ESXi)
 
-If `sed` runs silently (no output), it succeeded.
-
-### If `sed -i` errors out — fallback with `awk`
+Copy and paste this whole block into the shell:
 
 ```sh
 awk '/^modules=/ {print $0 " --- /ifre.v00"; next} {print}' /vmfs/volumes/BOOTBANK1/boot.cfg > /tmp/bc1.new
@@ -351,21 +346,109 @@ awk '/^modules=/ {print $0 " --- /ifre.v00"; next} {print}' /vmfs/volumes/BOOTBA
 cp /tmp/bc2.new /vmfs/volumes/BOOTBANK2/boot.cfg
 ```
 
+**What this does:** `awk` reads each line of `boot.cfg`. For the `modules=` line, it appends ` --- /ifre.v00` and prints. All other lines pass through unchanged. Output is redirected to a temp file in `/tmp/`, then `cp` overwrites the original. This bypasses the in-place-edit limitation.
+
+If both commands return without error → continue to 7.3 verify.
+
+### Method B — `sed -i` (try this only if Method A doesn't work)
+
+ESXi's `sed -i` (in-place edit) is unreliable on the busybox shell — it often **silently fails** without an error. Try only if Method A had an issue:
+
+```sh
+sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00|' /vmfs/volumes/BOOTBANK1/boot.cfg
+sed -i 's|imgpayld.tgz|imgpayld.tgz --- /ifre.v00|' /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+If `grep -c` (in 7.3 below) returns `0` after this → sed didn't take. Use Method A or C.
+
+### Method C — Manual `vi` (last resort)
+
+> ⚠️ vi displays the long `modules=` line wrapped with `@` continuation markers and possibly with syntax highlighting colors. These look like corruption but aren't — the file is fine. Don't be alarmed.
+
+```sh
+vi /vmfs/volumes/BOOTBANK1/boot.cfg
+```
+
+In `vi`:
+1. Press **Esc** to ensure you're in command mode.
+2. Press **`7G`** to jump directly to line 7 (the `modules=` line).
+3. Press **`$`** to move cursor to END of that line (even if it's visually wrapped).
+4. Press **`a`** to enter append-after-cursor mode (status line shows `-- INSERT --`).
+5. Type exactly: ` --- /ifre.v00` (note: leading space, then three dashes, then space, then `/ifre.v00`).
+6. Press **Esc** to leave insert mode.
+7. Type `:wq` and press **Enter** to save and quit.
+
+If you make a mistake: press **Esc**, type `:q!`, press Enter to quit without saving. Re-run the `vi` command.
+
+Repeat for BOOTBANK2:
+```sh
+vi /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
 ## 7.3 — Verify the edits
+
+Whichever method you used (A / B / C), always verify before rebooting:
+
+### 7.3.1 — Quickest check: count occurrences
 
 ```sh
 grep -c "ifre.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
 grep -c "ifre.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
 ```
 
-Both should print **`1`**.
+| Output | Meaning |
+|---|---|
+| Both print **`1`** | ✅ Edit succeeded — proceed to 7.4 reboot |
+| Either prints **`0`** | ❌ Edit didn't take — try a different method (A → C) and re-verify |
+| Either prints **`2`** or more | ⚠️ You ran the edit twice and `ifre.v00` is duplicated. ESXi tolerates this at boot but cleanup recommended (see "If duplicated" below) |
 
-Visually confirm the end of the modules line:
+### 7.3.2 — Confirm `ifre.v00` is the LAST entry (visual)
+
+```sh
+grep "modules=" /vmfs/volumes/BOOTBANK1/boot.cfg | awk -F' --- ' '{print $NF}'
+grep "modules=" /vmfs/volumes/BOOTBANK2/boot.cfg | awk -F' --- ' '{print $NF}'
+```
+
+This splits the modules line by ` --- ` and prints only the last field. **Expected output: each prints `/ifre.v00`** — meaning `ifre.v00` is correctly appended at the end of the modules list.
+
+### 7.3.3 — See the end of the long modules line
+
 ```sh
 grep "modules=" /vmfs/volumes/BOOTBANK1/boot.cfg | tail -c 100
 ```
 
 Should end with: `... --- /imgpayld.tgz --- /ifre.v00`
+
+### 7.3.4 — All-in-one sanity check (paste this block)
+
+```sh
+echo "=== Count check (expect 1 for each) ==="
+grep -c "ifre.v00" /vmfs/volumes/BOOTBANK1/boot.cfg
+grep -c "ifre.v00" /vmfs/volumes/BOOTBANK2/boot.cfg
+echo ""
+echo "=== Last entry (expect /ifre.v00) ==="
+grep "modules=" /vmfs/volumes/BOOTBANK1/boot.cfg | awk -F' --- ' '{print $NF}'
+grep "modules=" /vmfs/volumes/BOOTBANK2/boot.cfg | awk -F' --- ' '{print $NF}'
+```
+
+If both `1`s are printed AND both last-entry lines say `/ifre.v00` → **edit confirmed, proceed to 7.4**.
+
+### If duplicated (count returns 2 or more)
+
+You ran the edit twice. To clean up:
+
+```sh
+# Remove all instances of ' --- /ifre.v00' first, then re-add once
+sed -i 's| --- /ifre.v00||g' /vmfs/volumes/BOOTBANK1/boot.cfg
+awk '/^modules=/ {print $0 " --- /ifre.v00"; next} {print}' /vmfs/volumes/BOOTBANK1/boot.cfg > /tmp/bc1.new
+cp /tmp/bc1.new /vmfs/volumes/BOOTBANK1/boot.cfg
+
+sed -i 's| --- /ifre.v00||g' /vmfs/volumes/BOOTBANK2/boot.cfg
+awk '/^modules=/ {print $0 " --- /ifre.v00"; next} {print}' /vmfs/volumes/BOOTBANK2/boot.cfg > /tmp/bc2.new
+cp /tmp/bc2.new /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+Then re-run the count check. Should be `1` each.
 
 ## 7.4 — Yank the USB, then reboot
 
