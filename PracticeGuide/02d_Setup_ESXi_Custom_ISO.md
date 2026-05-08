@@ -1,6 +1,6 @@
-# 02d — Build a Custom ESXi 8 ISO with Realtek NIC Driver
+# 02d — Install Realtek NIC Driver on ESXi 8.0U3e (William Lam method, Windows version)
 
-The stock VMware ESXi 8 installer **does not include Realtek RTL8111/8125/8126/8127 NIC drivers**. If your motherboard (especially Gigabyte boards) uses an onboard Realtek NIC, the installer fails with:
+The stock VMware ESXi 8 installer **does not include Realtek RTL8111/8125/8126/8127 NIC drivers**. If your motherboard (Gigabyte boards in particular) has only an onboard Realtek NIC, the installer fails with:
 
 ```
 No Network Adapters
@@ -8,283 +8,343 @@ No network adapters were detected. Either no network adapters are physically
 connected to the system, or a suitable driver could not be located.
 ```
 
-**Good news (as of November 2025):** Broadcom released an **official Realtek Network Driver Fling** for ESXi 8.0 U3 and later. You no longer need community-maintained VIBs from defunct mirrors. This file walks you through using the official Broadcom Fling to build a working installer.
+This guide adapts **William Lam's official Feb 2026 walkthrough** for Windows users. It does **NOT** use PowerCLI / Python / OpenSSL / Image Builder — sidestepping all the dependency hell those introduce. We just extract the driver from the Fling, drop it into the USB installer, and edit a config file.
 
-> ✅ **Verified May 2026:** Broadcom-maintained Fling, not community-hacked. Andreas Peetz's old `v-front.de/vibsdepot` is dead — don't try to use it.
-
----
-
-## What we're building
-
-A custom ESXi 8.0U3e installer ISO with the **official Broadcom Realtek driver** baked in, so the installer detects your Realtek NIC during install.
-
-**Time:** ~45 minutes if everything works first try.
-**Cost:** Free.
-**Difficulty:** Moderate (requires PowerShell + PowerCLI on a Windows PC).
-
----
-
-## Honest caveats first
-
-| Caveat | Reality |
-|---|---|
-| Officially supported by Broadcom | ✅ Yes — released Nov 2025, updated to 1.101.01 shortly after |
-| ESXi 8.0 U3 / ESXi 9.x compatibility | ✅ Confirmed |
-| ESXi 7.x compatibility | ❌ Not supported (vmklinux drivers were removed in 7) |
-| RTL8111 / RTL8125 / RTL8126 / RTL8127 chips | ✅ Supported (covers 8168 family — what's on most Gigabyte boards) |
-| Hardware offload (TSO/LRO/WOL) | ❌ Not supported by the Fling — basic connectivity only. Fine for our practice lab. |
-| Performance | Realtek ~700 Mbps vs Intel ~940 Mbps. Plenty for the lab. |
-| Will it break on ESXi 8 updates | Low risk — Broadcom is shipping it themselves now |
-
-> **Easier alternatives if you don't want to do this:**
-> - **Buy an Intel I210-T1 PCIe NIC** (~₱700, 1–2 day shipping). Stock ESXi installer detects it instantly.
-> - **Skip ESXi entirely**, use VMware Workstation Pro per `02b_Setup_SinglePC_Practice.md`. Same MA1/MA2/CTF practice, no driver fight, ready in 30 min.
+> 📚 **Source:** `https://williamlam.com/2026/02/installing-realtek-network-driver-fling-using-free-esxi-8-0-update-3e-iso.html` (Feb 2026)
 >
-> Only proceed with this guide if you specifically want bare-metal ESXi.
+> Lam's post assumes macOS/Linux. This file translates the workflow to Windows.
+
+---
+
+## How this method works (high-level)
+
+The Realtek driver Fling ships as a `.vib` file (basically a Unix `ar` archive). We:
+
+1. Extract the driver payload from the `.vib` file.
+2. Rename the payload to `ifre.v00`.
+3. Copy `ifre.v00` to the root of the ESXi installer USB.
+4. Edit `boot.cfg` on the USB to load `ifre.v00` during boot.
+5. Boot the installer — Realtek NIC now detected.
+6. Complete install **but DON'T reboot yet**.
+7. SSH to ESXi → copy `ifre.v00` into both `BOOTBANK1` and `BOOTBANK2`.
+8. Edit `boot.cfg` in both bootbanks → append `ifre.v00`.
+9. Reboot — driver loads on every boot from now on.
+
+This is more steps than a custom ISO, but **no Python / OpenSSL / PowerCLI**.
+
+> ⏱️ **Total time:** ~45 min.
 
 ---
 
 ## Materials needed (all verified working May 2026)
 
-| # | Item | Source URL | Notes |
+| # | Item | Source | Notes |
 |---|---|---|---|
-| 1 | **Stock ESXi 8.0U3e ISO** | `https://support.broadcom.com/group/ecx/free-downloads` | Free; requires Broadcom account. Search "VMware vSphere Hypervisor 8". KB landing: `https://knowledge.broadcom.com/external/article/399823` |
-| 2 | **Realtek Driver Fling** (`VMware-Re-Driver_1.101.01-...zip`) | `https://support.broadcom.com/group/ecx/productdownloads?subfamily=Flings&freeDownloads=true` | Same Broadcom portal, **Flings** section. Same login. |
-| 3 | **PowerCLI 13.3.0** module | `https://www.powershellgallery.com/packages/VMware.PowerCLI` | Install via `Install-Module` (covered below) |
-| 4 | **Rufus** | `https://rufus.ie/` | Already in use |
-| 5 | A Windows PC with internet | PC1 | For the build |
-| 6 | USB stick (8 GB+) | Already in use | We'll re-write it |
-
-### Reference reading (verified working)
-
-- **William Lam — Realtek Network Driver for ESXi (Nov 2025)**: `https://williamlam.com/2025/11/realtek-network-driver-for-esxi.html`
-- **William Lam — Installing on free ESXi 8.0U3e (Feb 2026)** ⭐: `https://williamlam.com/2026/02/installing-realtek-network-driver-fling-using-free-esxi-8-0-update-3e-iso.html`
-- **CoSci.de — How-to for RTL8111/8125/8126/8127 on ESXi 8.0U3 (Dec 2025)**: `https://cosci.de/en/server-en/install-realtek-network-driver-on-vmware-esxi-8-0-3-how-to-enable-rtl8125-rtl8111-rtl8126-and-rtl8127/`
-
-These three blog posts are the authoritative external references. If anything in this guide is unclear, cross-reference there.
+| 1 | **Stock ESXi 8.0U3e ISO** | `https://support.broadcom.com/group/ecx/free-downloads` (Broadcom account required) | The stock free installer. KB landing: `https://knowledge.broadcom.com/external/article/399823` |
+| 2 | **Realtek Driver Fling v1.101.01** | `https://support.broadcom.com/group/ecx/productdownloads?subfamily=Flings&freeDownloads=true` | Same Broadcom portal, **Flings** section. Download `VMware-Re-Driver_1.101.01-...zip` |
+| 3 | **Rufus** | `https://rufus.ie/` | For writing the USB |
+| 4 | **7-Zip** | `https://www.7-zip.org/` | Can open the `.vib` (which is an `ar` archive) on Windows |
+| 5 | **WinSCP** | `https://winscp.net/` | For copying `ifre.v00` to ESXi after install |
+| 6 | **PuTTY** | `https://www.putty.org/` | For SSH-ing to ESXi to edit boot.cfg |
+| 7 | A USB stick (8 GB+) | Already in use | We'll re-write it with the modified installer |
 
 ---
 
-## Step 1 — Download the stock ESXi 8.0U3e ISO from Broadcom (15 min)
+## Step 1 — Download stock ESXi 8.0U3e ISO from Broadcom (15 min)
 
-1. From PC1 browser, visit: `https://support.broadcom.com/`
-2. Sign in (or register a free Broadcom account — needed for both downloads).
-3. Navigate to **My Downloads** → search "**VMware vSphere Hypervisor 8**".
-4. Pick **VMware vSphere Hypervisor 8.0 Update 3e** (the current free version, re-released April 2025).
-5. Accept the EULA, copy the free license key shown on the same page (you'll need it later).
+1. Browser → `https://support.broadcom.com/`
+2. Sign in (or register a free Broadcom account).
+3. **My Downloads** → search "**VMware vSphere Hypervisor 8**".
+4. Pick **VMware vSphere Hypervisor 8.0 Update 3e** (free).
+5. Accept the EULA, copy the free license key shown on the page.
 6. Download the ISO (~640 MB).
-7. Save to `D:\esxi-build\` on PC1. The filename will be similar to:
+7. Save to `D:\esxi-build\` on PC1. Filename like:
    ```
    VMware-VMvisor-Installer-8.0U3e-24585291.x86_64.iso
    ```
 
-> ⚠️ Broadcom's download portal is slow and confusing. If you can't find it via search, try the KB direct link: `https://knowledge.broadcom.com/external/article/399823`.
+---
+
+## Step 2 — Download the Realtek Driver Fling (5 min)
+
+1. Same Broadcom portal. Navigate to: `https://support.broadcom.com/group/ecx/productdownloads?subfamily=Flings&freeDownloads=true`
+2. Find **Realtek Network Driver for ESXi**.
+3. Latest version: **1.101.01** (Nov 2025).
+4. Download the `.zip` bundle (e.g., `VMware-Re-Driver_1.101.01-5vmw.800.1.0.20613240.zip`).
+5. Save to `D:\esxi-build\`.
 
 ---
 
-## Step 2 — Download the Realtek Driver Fling from Broadcom (5 min)
+## Step 3 — Extract the `.vib` file from the offline bundle (3 min)
 
-Same Broadcom portal, different section.
+The Fling is a `.zip` containing the offline bundle. Inside that bundle is the actual `.vib` driver file.
 
-1. From PC1 browser: `https://support.broadcom.com/group/ecx/productdownloads?subfamily=Flings&freeDownloads=true`
-2. Find **Realtek Network Driver for ESXi** in the Flings list.
-3. Latest version as of writing: **1.101.01** (Nov 2025 update — fixes early 1.x bugs).
-4. Download: `VMware-Re-Driver_1.101.01-5vmw.800.1.0.20613240.zip` (or newer build number).
-5. Save to `D:\esxi-build\` alongside the stock ISO.
-
-> 💡 **Verify your chipset is supported** before downloading. The Fling covers:
-> - RTL8111 (most Gigabyte boards — including yours)
-> - RTL8125 (newer 2.5 GbE chips)
-> - RTL8126 (5 GbE)
-> - RTL8127 (10 GbE)
->
-> All "8168" devices use the RTL8111 family driver — supported.
-
-To confirm your chipset on Windows: **Device Manager → Network adapters → Realtek entry → Properties → Details → Hardware IDs** → look for `PCI\VEN_10EC&DEV_8168` (RTL8111 family) or `&DEV_8125` (RTL8125).
+1. Open `D:\esxi-build\` in File Explorer.
+2. Right-click the `VMware-Re-Driver_1.101.01-...zip` → **7-Zip → Extract Here**.
+3. You'll get a folder structure. Navigate into it:
+   ```
+   VMware-Re-Driver_1.101.01-...
+   └── vib20\
+       └── if-re\
+           └── vmw_bootbank_if-re_1.101.01-5vmw.800.1.0.20613240.vib
+   ```
+4. Copy the `.vib` file (e.g., `vmw_bootbank_if-re_1.101.01-5vmw.800.1.0.20613240.vib`) up to `D:\esxi-build\` so it's easier to work with.
 
 ---
 
-## Step 3 — Install PowerCLI on PC1 (5 min)
+## Step 4 — Extract `ifre.v00` from the `.vib` file (2 min)
 
-Open **PowerShell as Administrator** on PC1:
+A `.vib` file is actually a Unix `ar` archive. Windows doesn't have `ar` natively. The **7-Zip GUI ("Open archive") does NOT reliably show the top-level structure** of `.vib` files — it tends to auto-drill into the payload, so you'll see folders like `usr/`, `etc/` instead of the three files we need (`descriptor.xml`, `sig.pkcs7`, `if-re`).
 
-```powershell
-# Allow scripts (one-time per machine)
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+**Use the command-line method instead — it's actually the most reliable:**
 
-# Install PowerCLI from PowerShell Gallery
-Install-Module -Name VMware.PowerCLI -Scope CurrentUser -Force -AllowClobber
+### Method A — 7-Zip command-line ✅ recommended
 
-# Suppress noisy warnings (CEIP, SSL)
-Set-PowerCLIConfiguration -InvalidCertificateAction Ignore -ParticipateInCEIP $false -Confirm:$false
-```
-
-PowerCLI is ~150 MB across many sub-modules — install takes ~3 min.
-
-Verify:
-```powershell
-Get-Module -ListAvailable VMware.PowerCLI | Select-Object Name, Version
-```
-Should print **13.3.0.24145083** or newer.
-
-> ⚠️ Broadcom flagged `VMware.PowerCLI` as deprecated in favor of `VCF.PowerCLI`. For ISO-building, the old module still works perfectly. Don't worry about it.
-
----
-
-## Step 4 — Build the custom ISO with PowerCLI (10–15 min)
-
-Stay in PowerShell as Administrator. Switch to your build folder:
+Open **PowerShell** (regular, non-admin is fine) in `D:\esxi-build\`:
 
 ```powershell
 cd D:\esxi-build
-ls   # should show the stock ISO + the Re-Driver zip
+& "C:\Program Files\7-Zip\7z.exe" e .\vmw_bootbank_if-re_1.101.01-*.vib
 ```
 
-### 4.1 — Open the stock ISO as a software depot
+> The `e` flag (lowercase) means "extract files, no paths" — dumps everything from the **top level** into the current directory.
 
+You should see 7-Zip print something like:
+```
+Files: 3
+Size: ~85000
+Compressed: ~85000
+Everything is Ok
+```
+
+Now `D:\esxi-build\` contains 3 new files:
+- `descriptor.xml`  (~2 KB — the metadata)
+- `sig.pkcs7`  (~5 KB — the signature)
+- `if-re`  (~50–200 KB — **the driver payload we need**)
+
+Verify they all appeared:
 ```powershell
-Add-EsxSoftwareDepot .\VMware-VMvisor-Installer-8.0U3e-*.iso
+Get-ChildItem -File | Sort-Object Length -Descending | Select-Object Name, Length -First 5
 ```
 
-### 4.2 — Add the Realtek Fling as a second depot
-
+You should see `if-re` as the largest of the new files. Then rename it:
 ```powershell
-Add-EsxSoftwareDepot .\VMware-Re-Driver_1.101.01-*.zip
+Rename-Item ".\if-re" "ifre.v00"
 ```
 
-(Adjust filename to whatever you actually downloaded.)
-
-### 4.3 — Find the stock image profile name
-
+Verify:
 ```powershell
-Get-EsxImageProfile | Sort-Object CreationTime -Descending | Select-Object Name, CreationTime -First 5
+Get-Item .\ifre.v00 | Format-List Name, Length
 ```
 
-You'll see something like:
+Expected:
 ```
-Name                                           CreationTime
-----                                           ------------
-ESXi-8.0U3e-24585291-standard                  2025-04-15
-ESXi-8.0U3e-24585291-no-tools                  2025-04-15
+Name   : ifre.v00
+Length : 87042   (or similar, between ~50,000 and ~250,000)
 ```
 
-Copy the `-standard` name (the one with VMware Tools — recommended).
+If `Length` is much bigger than 250 KB or much smaller than 50 KB → wrong file. Re-extract.
 
-### 4.4 — Clone the standard profile
+### Method B — WSL with `ar` (fallback if 7-Zip command-line fails)
 
-```powershell
-$base = "ESXi-8.0U3e-24585291-standard"   # adjust to match what you saw above
-New-EsxImageProfile -CloneProfile $base -Name "ESXi-8.0U3e-with-Realtek" -Vendor "Custom" -AcceptanceLevel PartnerSupported
+If 7-Zip refuses to extract the `.vib` (e.g., "cannot open as archive"), the cleanest fallback is **Windows Subsystem for Linux** which has the actual `ar` tool that William Lam used on macOS.
+
+#### One-time WSL install (~10 min, only if needed)
+1. Open **PowerShell as Administrator** → run:
+   ```powershell
+   wsl --install
+   ```
+2. Reboot when prompted.
+3. After reboot, the Ubuntu installer auto-launches. Set a username + password (anything you'll remember).
+4. Done.
+
+#### Extract the `.vib` with `ar`
+Open the **Ubuntu** terminal (Start menu → Ubuntu) and run:
+
+```bash
+cd /mnt/d/esxi-build/
+ar -x vmw_bootbank_if-re_1.101.01-5vmw.800.1.0.20613240.vib
+ls -la
+# You should see: descriptor.xml  sig.pkcs7  if-re
+mv if-re ifre.v00
+ls -la ifre.v00
 ```
 
-> The Broadcom Fling is **PartnerSupported** acceptance level (not Community), so we set the clone profile to match.
+The file `ifre.v00` is now in `D:\esxi-build\` (visible from Windows too).
 
-### 4.5 — List the Realtek packages from the Fling depot
+### Method C — Why 7-Zip GUI ("Open archive") doesn't work for this
 
-```powershell
-Get-EsxSoftwarePackage | Where-Object { $_.Name -like "*re-*" -or $_.Name -like "*realtek*" }
+If you tried the 7-Zip GUI ("Open archive") and saw a folder structure like:
+```
+usr\lib\vmware\vmkmod\if_re\
 ```
 
-You should see the package name. Most likely: `VMware-Re-Driver` or just `re`. Note the exact `Name` value.
+That's because 7-Zip auto-decompressed the `if-re` payload (it recognized the inner gzip+cpio format) and showed you the **post-install file layout**. We don't want that — we want the raw outer payload.
 
-### 4.6 — Inject the package into your custom profile
+**Don't use 7-Zip GUI for this step.** Use Method A (command-line) or Method B (WSL).
 
-Replace `<package-name>` with what Step 4.5 returned:
-
-```powershell
-Add-EsxSoftwarePackage -ImageProfile "ESXi-8.0U3e-with-Realtek" -SoftwarePackage "<package-name>"
-```
-
-If acceptance-level issues:
-```powershell
-Add-EsxSoftwarePackage -ImageProfile "ESXi-8.0U3e-with-Realtek" -SoftwarePackage "<package-name>" -Force
-```
-
-### 4.7 — Export the new profile to a bootable ISO
-
-```powershell
-Export-EsxImageProfile -ImageProfile "ESXi-8.0U3e-with-Realtek" `
-  -ExportToIso -FilePath "D:\esxi-build\ESXi-8.0U3e-with-Realtek.iso" -Force
-```
-
-5–10 min later you have:
-```
-D:\esxi-build\ESXi-8.0U3e-with-Realtek.iso
-```
-
-That's your custom installer.
+If you already extracted via the GUI and see `usr\` and `etc\` folders — just delete them and start over with Method A.
 
 ---
 
-## Step 5 — Write the custom ISO to USB with Rufus (3 min)
+## Step 5 — Write the stock ESXi ISO to USB with Rufus (3 min)
 
-1. Plug the USB stick back into PC1.
-2. Open **Rufus** (`https://rufus.ie/`).
+1. Plug in the USB stick (it'll be wiped).
+2. Open Rufus.
 3. **Device:** select your USB.
-4. **Boot selection** → **SELECT** → pick `ESXi-8.0U3e-with-Realtek.iso`.
-5. **Partition scheme:** **GPT** (for UEFI boot).
+4. **Boot selection** → **SELECT** → pick the **stock** `VMware-VMvisor-Installer-8.0U3e-...iso` (NOT a custom one).
+5. **Partition scheme:** **GPT** (for UEFI).
 6. **File system:** leave default.
 7. Click **START**.
 8. Prompt: *"Write in DD Image mode?"* → **Yes**.
-9. Confirm wipe → wait ~3 min → eject.
-
-> ⚠️ **DD mode is mandatory** for ESXi installers. ISO mode will boot but error mid-install.
+9. Wait ~3 min. **Don't eject** — we'll edit files on it next.
 
 ---
 
-## Step 6 — Boot the 3rd PC from the custom USB
+## Step 6 — Modify the USB to load the Realtek driver during install (5 min)
+
+The USB is now a bootable ESXi installer. We add `ifre.v00` and tell `boot.cfg` to load it.
+
+### 6.1 — Open the USB in File Explorer
+The USB will show up under "This PC" with a label like `ESXI-X.X.X` (multiple partitions). The one we want is the **EFI partition** that contains a `BOOT` folder.
+
+> ⚠️ Windows sometimes shows a "Format disk" prompt for unfamiliar partitions. **Click Cancel** — DON'T format. Use a tool like **EaseUS Partition Master Free** or **Rufus's mounted partitions** if Windows can't natively browse all partitions.
+
+If you have trouble browsing the USB partitions:
+- **Easier path:** use **DiskGenius Free** (`https://www.diskgenius.com/free.php`) → browse all partitions → find the one with `BOOT.CFG`.
+
+### 6.2 — Copy `ifre.v00` to the USB root + EFI/BOOT folder
+1. Copy `D:\esxi-build\ifre.v00` to:
+   - The **root** of the EFI partition (alongside `BOOT.CFG`)
+   - Also copy to `EFI\BOOT\` folder (some systems read from there)
+2. Two copies of the same file — paranoia for both legacy and UEFI paths.
+
+### 6.3 — Edit `BOOT.CFG` to load the new module
+1. Find `BOOT.CFG` in the EFI partition root (and in `EFI\BOOT\` — there are usually two copies).
+2. Open with Notepad++ or any text editor (NOT regular Notepad — line endings matter).
+3. You'll see a line like:
+   ```
+   modules=b.b00 --- jumpstrt.gz --- useropts.gz --- features.gz --- k.b00 --- uc_intel.b00 --- uc_amd.b00 --- uc_hygon.b00 --- procfs.b00 --- vmx.v00 --- vim.v00 --- ...
+   ```
+   It's one **very long single line** with many `.b00`/`.v00` files separated by ` --- `.
+4. **Append `--- ifre.v00`** at the end of the modules list:
+   ```
+   modules=...(everything)... --- vsanmgmt.v00 --- xorg.v00 --- ifre.v00
+   ```
+5. Save the file. Repeat for both copies of `BOOT.CFG` if there are two.
+
+> ⚠️ **Critical:** must be `--- ifre.v00` (three dashes, single space, the filename). One missing dash and the boot fails.
+
+### 6.4 — Safely eject the USB
+Right-click the USB drive in File Explorer → **Eject**.
+
+---
+
+## Step 7 — Boot the 3rd PC from the USB (5 min)
 
 1. Plug the USB into the 3rd PC.
-2. Power on → press **F12** repeatedly during the Gigabyte splash logo to open the boot menu.
-3. Select your USB → **Enter**.
-4. ESXi installer loads (yellow/black VMware splash).
-5. **Watch the early boot text** — you should see kernel module load lines like:
+2. Power on → press **F12** repeatedly during the Gigabyte splash logo → boot menu.
+3. Select your USB → Enter.
+4. ESXi installer loads. **Watch the boot text** — you should see:
    ```
-   re               loaded successfully
+   loading /ifre.v00
    ```
-   (or similar Realtek confirmation).
-6. The installer prompt should now show **"1 NIC(s) found"** instead of the previous "No Network Adapters" error.
+   Right before the installer launches. That's the Realtek driver loading.
+5. The installer prompt now shows **"1 NIC(s) found"** instead of the previous error.
 
 ---
 
-## Step 7 — Continue the install per `02c_…` Section D
+## Step 8 — Run the ESXi installer normally (10 min)
 
-From here, the install is identical to a stock ESXi install:
+Follow `02c_Setup_ESXi_Server.md` Section D click-by-click:
+- Welcome → F11 to accept EULA
+- Pick disk → keyboard → set root password
+- F11 to install → wait
 
-- **`02c_Setup_ESXi_Server.md` Section D** — wizard click-by-click (welcome → EULA → disk → keyboard → root pwd → install).
-- Then **Section E** — set static management IP per `02_Setup_Topology.md` Section A.
+> ⚠️ **CRITICAL:** when installation finishes and prompts to **press Enter to reboot — DO IT. But the FIRST reboot will lose the driver** because we haven't yet copied `ifre.v00` into the persistent boot banks. ESXi's first boot will fail to find the NIC.
+
+You have two options:
+
+### Option A (William Lam's method) — Skip the reboot, drop to ESXi shell now
+1. **Don't press Enter** when prompted to reboot.
+2. Press **Alt+F1** → log in as `root` / your password.
+3. Continue to Step 9 below from this shell.
+
+### Option B (more practical) — Let it reboot, fix from another machine
+The first boot fails (no NIC). To recover:
+1. Yank USB during reboot, but boot ESXi from disk (it's installed).
+2. Console will show `0.0.0.0` for IP (no NIC).
+3. Press F2 at console → log in as root → drop to shell with **F1** then `unsupported` (or use the troubleshoot menu).
+4. From the shell, manually mount the USB or use a second USB with `ifre.v00` on it → copy to bootbanks (Step 9).
+
+**Option A is cleaner.** Do it.
 
 ---
 
-## Verification after install
+## Step 9 — Copy `ifre.v00` to both bootbanks (5 min)
 
-### V1 — Console shows IP
-The yellow/grey ESXi splash should show `https://192.168.x.x/` at the top. If `0.0.0.0` → set static IP via F2 → Configure Management Network.
+You're at the ESXi console shell (Option A above) or you've SSH'd in.
 
-### V2 — From PC1 browser
-Browse to `https://<ESXi-IP>/ui` → log in as `root` → confirm web UI loads.
+```sh
+# William Lam's exact commands — run as root:
 
-### V3 — Confirm Realtek NIC is detected
-ESXi web UI → **Networking → Physical NICs**. You should see `vmnic0` with driver `re` (or `r8168`, depending on driver version).
+cp /tardisks/ifre.v00 /vmfs/volumes/BOOTBANK1/ifre.v00
+cp /tardisks/ifre.v00 /vmfs/volumes/BOOTBANK2/ifre.v00
+```
 
-If `vmnic0` is up but speed shows `0 Mbps`:
-- SSH to ESXi (enable via *Manage → Services → TSM-SSH → Start*)
-- Run `esxcfg-nics -l` → check link state
-- Verify cable + switch port good
+Verify:
+```sh
+ls -la /vmfs/volumes/BOOTBANK1/ifre.v00
+ls -la /vmfs/volumes/BOOTBANK2/ifre.v00
+```
+
+Both should show file size matching what was on the USB.
 
 ---
 
-## Alternative: post-install driver injection (if custom-ISO approach fails)
+## Step 10 — Edit `boot.cfg` in BOTH bootbanks (5 min)
 
-If for some reason the custom ISO won't build, you can **install ESXi via temporary USB-Ethernet adapter or different machine, then add the driver afterward**:
+Both BOOTBANK1 and BOOTBANK2 have their own `boot.cfg`. Edit both.
 
-```bash
-# SSH into running ESXi first
-esxcli software component apply -d /vmfs/volumes/datastore1/VMware-Re-Driver_1.101.01-*.zip
+```sh
+vi /vmfs/volumes/BOOTBANK1/boot.cfg
+```
+
+Find the `modules=` line. Append ` --- ifre.v00` at the end (just like you did on the USB in Step 6.3). Save (`:wq` in vi).
+
+Repeat for BOOTBANK2:
+```sh
+vi /vmfs/volumes/BOOTBANK2/boot.cfg
+```
+
+> ⚠️ **vi quick reference if you're not familiar:**
+> - Press `i` to enter insert mode → make edits.
+> - Press `Esc` to exit insert mode.
+> - Type `:wq` then Enter to save and quit.
+> - If you mess up: `Esc` → `:q!` → Enter to quit without saving, then start over.
+
+---
+
+## Step 11 — Reboot
+
+```sh
 reboot
 ```
 
-After reboot the Realtek NIC will be detected. CoSci.de's blog post (linked above in References) walks this through.
+PC reboots. This time it loads `ifre.v00` from the bootbank → Realtek NIC initializes → DHCP picks up an IP → the console shows `https://192.168.x.x/` at the top.
+
+---
+
+## Verification
+
+### V1 — Console shows IP
+ESXi splash should show `https://192.168.x.x/` (not `0.0.0.0`).
+
+### V2 — Web UI from PC1
+Browser → `https://<ESXi-IP>/ui` → log in as `root` → confirm web UI loads.
+
+### V3 — NIC visible in web UI
+Web UI → **Networking → Physical NICs** → should see `vmnic0` with driver `if-re`.
 
 ---
 
@@ -292,49 +352,41 @@ After reboot the Realtek NIC will be detected. CoSci.de's blog post (linked abov
 
 | Error | Fix |
 |---|---|
-| `Add-EsxSoftwareDepot: Could not load file or assembly` | PowerCLI install incomplete. `Update-Module VMware.PowerCLI -Force` |
-| `Add-EsxSoftwarePackage: package could not be located` | The package name is different. Re-run Step 4.5 with broader filter: `Get-EsxSoftwarePackage \| Format-Table Name, Vendor` |
-| `Insufficient acceptance level` | Add `-Force` flag. The Fling is PartnerSupported, profile clone must match. |
-| ISO builds but still "No NIC" at install | Re-check chipset against supported list (RTL8111/8125/8126/8127). RTL8169 (older) is **not** in this Fling — that one needs a community VIB or a different approach. |
-| Custom ISO boots but PSOD (purple screen of death) | Driver incompatibility. Try fresh build with the latest Re-Driver version. If still fails, switch strategy (Intel NIC or Workstation). |
-| Rufus has no DD mode prompt | Update Rufus. Or re-export the ISO; PowerCLI sometimes produces a non-bootable ISO if it ran low on disk. |
+| 7-Zip can't open the `.vib` file | Try `7z e file.vib` from command line. Or use WSL with `ar -x`. Or copy `.vib` to any Linux machine and run `ar -x` there. |
+| `BOOT.CFG` doesn't have a `modules=` line visible | You opened the wrong partition. The EFI partition has it; the data partition doesn't. Check all partitions on the USB. |
+| `loading /ifre.v00` not seen at boot | `BOOT.CFG` edit didn't take — re-check `--- ifre.v00` syntax (three dashes + space + filename). |
+| Still "No Network Adapters" after boot | Wrong NIC chipset (e.g., RTL8169 — older, not in this Fling). Cross-check Device Manager hardware ID. |
+| Can't drop to shell after install (Alt+F1 doesn't work) | Use Option B from Step 8 — boot another USB with `ifre.v00` and recover from the troubleshooting menu. |
+| `cp` to BOOTBANK fails with "permission denied" | You need to be `root`, not the install-user. `whoami` to check. |
+| After reboot, NIC works but is slow | Realtek throughput tops out at ~700 Mbps. Normal. Not a fix needed. |
 
 ---
 
-## If this fails twice — fallback strategy
+## If this still fails after 2 attempts
 
-You've spent ~1.5 hours and the custom-ISO approach isn't working. Don't sink more time. In order of preference:
+Stop sinking time into ESXi. Two pragmatic alternatives:
 
-1. **Buy Intel I210-T1 PCIe NIC** (~₱700, 1–2 days). Stock ESXi installer detects it instantly.
-2. **Use ESXi 7.0 U3** instead of 8.x. ESXi 7 has broader NIC support natively. The lab works identically — none of the MA1/MA2/CTF deliverables care about the ESXi version.
-3. **Switch to VMware Workstation Pro** per `02b_Setup_SinglePC_Practice.md`. 30 min to running, no driver issues.
+1. **Buy an Intel I210-T1 PCIe NIC card** (~₱700, 1–2 days delivery on Lazada/Shopee). Stock ESXi installer detects it instantly.
+2. **Switch to VMware Workstation Pro** per `02b_Setup_SinglePC_Practice.md`. Same MA1/MA2/CTF practice, no driver fight, ready in 30 min.
 
-**Be honest about cost vs benefit:** the ESXi web UI experience is worth ~5 minutes of unfamiliarity at competition. If the custom-ISO route is eating multiple hours of your prep window, it's the wrong investment.
-
----
-
-## Updating to a future ESXi version
-
-If Broadcom releases ESXi 8.0 U4+ or ESXi 9.x:
-
-1. Download the new stock ISO.
-2. Repeat Steps 4.1–4.7 with the new ISO + the **same Re-Driver Fling** (Broadcom maintains it across versions).
-3. The driver should keep working — Broadcom has committed to maintaining it.
-
-For ESXi 9.0 specifically: the William Lam Feb 2026 post confirms compatibility.
+The actual graded work (MA1 pentest, MA2 hardening, CTF) doesn't care whether the lab runs on ESXi or Workstation. Don't burn 4 hours of practice time fighting drivers.
 
 ---
 
-## References (verified working May 2026)
+## References (verified May 2026)
 
-- **William Lam — Realtek Network Driver for ESXi (Nov 2025)**: `https://williamlam.com/2025/11/realtek-network-driver-for-esxi.html`
-- **William Lam — Installing on free ESXi 8.0U3e (Feb 2026)** ⭐ best step-by-step: `https://williamlam.com/2026/02/installing-realtek-network-driver-fling-using-free-esxi-8-0-update-3e-iso.html`
-- **CoSci.de — RTL8111/8125/8126/8127 install guide (Dec 2025)**: `https://cosci.de/en/server-en/install-realtek-network-driver-on-vmware-esxi-8-0-3-how-to-enable-rtl8125-rtl8111-rtl8126-and-rtl8127/`
-- **andysworld.org.uk — Minisforum Realtek install (Jan 2026)**: `https://andysworld.org.uk/2026/01/11/minisforum-ms-a2-how-to-install-the-new-realtek-driver-on-esxi-8-0/`
-- **Broadcom Community — Realtek discussion thread**: `https://community.broadcom.com/vmware-cloud-foundation/discussion/realtek-network-card-drivers-for-esxi-v7-and-later`
-- **Broadcom ESXi 8.0U3e free download KB**: `https://knowledge.broadcom.com/external/article/399823`
-- **PowerCLI on PSGallery**: `https://www.powershellgallery.com/packages/VMware.PowerCLI`
+- **William Lam — Installing Realtek Driver Fling on free ESXi 8.0U3e** ⭐ source for this guide:
+  `https://williamlam.com/2026/02/installing-realtek-network-driver-fling-using-free-esxi-8-0-update-3e-iso.html`
+- **William Lam — Realtek Network Driver for ESXi (Nov 2025 background)**:
+  `https://williamlam.com/2025/11/realtek-network-driver-for-esxi.html`
+- **CoSci.de — RTL8111/8125/8126/8127 walkthrough (Dec 2025)**:
+  `https://cosci.de/en/server-en/install-realtek-network-driver-on-vmware-esxi-8-0-3-how-to-enable-rtl8125-rtl8111-rtl8126-and-rtl8127/`
+- **Broadcom Realtek Fling page**:
+  `https://community.broadcom.com/vmware-cloud-foundation/discussion/realtek-network-card-drivers-for-esxi-v7-and-later`
+- **Broadcom ESXi 8.0U3e free download KB**:
+  `https://knowledge.broadcom.com/external/article/399823`
+- **7-Zip (extracts `.vib` files)**: `https://www.7-zip.org/`
 
 ---
 
-When done with the install → return to **`02c_Setup_ESXi_Server.md` Section E** for post-install network config, then **`02_Setup_Topology.md` Section B** for port group creation.
+When the install is done and the NIC works → return to **`02c_Setup_ESXi_Server.md` Section E** (network config), then **`02_Setup_Topology.md` Section B** (port group creation).
