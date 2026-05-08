@@ -134,6 +134,7 @@ Sum K-values across completed steps = your raw score per criterion (max 25 each,
 | `02_Setup_Topology.md` | 3-PC ESXi physical setup (TP-Link router + switch + 2 PCs + ESXi server) |
 | `02b_Setup_SinglePC_Practice.md` | Single-PC alternative (VMware Workstation only, no ESXi) |
 | `02c_Setup_ESXi_Server.md` | ESXi 8 install on the 3rd PC |
+| `02d_Setup_ESXi_Custom_ISO.md` | **Troubleshooting: build custom ESXi ISO with Realtek driver** (only if stock ISO fails with "No Network Adapters") |
 | `03_Setup_VMs_MA1.md` | Build the MA1 CMS pentest target + Kali |
 | `04_Setup_VMs_MA2.md` | Build the manila.com environment (pfSense, AD, PKI, LinSRV1, clients) |
 | `05_Setup_JuiceShop.md` | OWASP Juice Shop install + Burp config |

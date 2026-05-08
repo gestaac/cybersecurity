@@ -34,11 +34,13 @@ If your motherboard has only a Realtek NIC, ESXi will install but **show no netw
 
 | Option | What | Cost |
 |---|---|---|
-| **Add an Intel I219/I225 PCIe NIC** ✅ recommended | Cheap PCIe card with a supported Intel chip | ~₱700–1,000 |
-| **Use a community-built ESXi ISO with extra drivers** ⚠️ unsupported by VMware | Use **ESXi-Customizer** or download a community ISO with Realtek drivers re-injected | Free, but unofficial |
-| **Boot the live Linux installer first** | Install Proxmox VE 8 instead — supports Realtek out of the box, runs the same VMs (`01_…` Section 1.2 mentions this fallback) | Free |
+| **Add an Intel I210/I225 PCIe NIC** ✅ recommended | Cheap PCIe card with a supported Intel chip | ~₱700–1,000 |
+| **Build a custom ESXi ISO with the Realtek driver injected** | Use PowerCLI to merge the community Realtek VIB into the stock ISO. **Full walkthrough: `02d_Setup_ESXi_Custom_ISO.md`** | Free (~45 min effort) |
+| **Skip ESXi entirely, use Workstation Pro** | Run all VMs in VMware Workstation on Windows directly (per `02b_…`). Same practice value, no driver fight | Free |
 
 **To check before committing:** Google your motherboard model + "ESXi 8 compatibility". Or check the VMware HCL link in A.1.
+
+> 🚨 If you boot the stock ESXi installer and see *"No Network Adapters"* error → that's the Realtek issue. **Go directly to `02d_Setup_ESXi_Custom_ISO.md`** for the custom-ISO build, OR fall back to `02b_…` for Workstation Pro.
 
 ### A.5 BIOS / UEFI features required
 You'll enable these in BIOS (next section):
