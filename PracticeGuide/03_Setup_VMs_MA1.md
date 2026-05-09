@@ -233,22 +233,66 @@ cat /etc/netplan/00-installer-config.yaml
 ```
 Compare line-by-line with the YAML above. If anything is wrong, re-run `sudo nano /etc/netplan/00-installer-config.yaml` and fix it.
 
-Apply:
-```bash
-sudo netplan apply
+#### Step 2.2.1 — Fix file permissions FIRST (before applying)
+
+By default, the file you just created is world-readable, which makes netplan complain on every apply with warnings like:
+
+```
+WARNING: Permissions for /etc/netplan/00-installer-config.yaml are too open.
+         Configuration should NOT be accessible by others.
 ```
 
-If you see a permissions warning, fix it then re-apply:
+Fix it once now so you don't see the warnings later:
+
 ```bash
 sudo chmod 600 /etc/netplan/00-installer-config.yaml
+```
+
+This makes the file readable + writable **only by root**. No more permission warnings.
+
+#### Step 2.2.2 — Apply the network config
+
+```bash
 sudo netplan apply
 ```
 
-Verify:
+**Expected output: no warnings, no output, just back to the prompt.**
+
+> 💡 If you forgot Step 2.2.1 and ran `netplan apply` first, you may have seen a wall of yellow `WARNING` text plus a separate `WARNING:root:Cannot call Open vSwitch: ovsdb-server.service is not running.` — both are **non-fatal**. The "Open vSwitch" one is harmless (Ubuntu probing for advanced networking we don't use; ignore forever). The permissions ones disappear once you run `chmod 600`. The IP gets applied either way.
+
+#### Step 2.2.3 — Verify the IP is set
+
 ```bash
-ip a show ens34                            # ← your interface name
+ip a show ens34                            # ← use YOUR interface name
 ```
-Should show: `inet 192.168.2.1/24 brd 192.168.2.255 scope global ens34`.
+
+Look for the line:
+```
+inet 192.168.2.1/24 brd 192.168.2.255 scope global ens34
+```
+
+If you see `inet 192.168.2.1/24` → ✅ **static IP is set.**
+
+Also check the route:
+
+```bash
+ip route
+```
+
+Should show:
+```
+default via 192.168.2.254 dev ens34 proto static
+192.168.2.0/24 dev ens34 proto kernel scope link src 192.168.2.1
+```
+
+#### Common warnings during `netplan apply`
+
+| Warning | Meaning | Action |
+|---|---|---|
+| `Permissions for /etc/netplan/...yaml are too open` | File is readable by all users | Run `sudo chmod 600 /etc/netplan/00-installer-config.yaml` once. Re-apply. Goes away. |
+| `WARNING:root:Cannot call Open vSwitch: ovsdb-server.service is not running` | Netplan checked for OpenVSwitch (advanced virtual switching). We don't use it. | **Ignore — completely harmless.** Will appear forever, doesn't affect anything. |
+| `Cannot find unique matching interface for ens34` | The interface name in your YAML doesn't match `ip link show` | Re-run `ip link show`, fix the name in the YAML, save, re-apply. |
+| YAML parse error like `mapping values are not allowed here` | Indentation is wrong in your YAML | Re-open with nano, count spaces carefully (use the cheat sheet in Step 2.2). |
 
 **CentOS:**
 ```bash
