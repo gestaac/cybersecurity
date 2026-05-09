@@ -76,11 +76,15 @@ Both VMs sit on the **PG-MA1-CMS** port group on the ESXi server with subnet `19
 - Tab to **[Done]** → **Enter**.
 
 **Screen 6 — Network connections**
-- You'll see one entry: `ens160 eth -` (or `ens33`) showing it's trying to get DHCP and probably failing (since PG-MA1-CMS has no DHCP server).
-- **Don't worry** — leave it as DHCPv4. We'll set static IP after install in Step 2.2.
+- You'll see one entry like `ens33 eth -` or `ens34` or `ens160` showing it's trying to get DHCP and **failing** (since PG-MA1-CMS has no DHCP server). Status will say `DISABLED` / `auto-config failed` — that's expected.
+- 📝 **Write down the interface name** (e.g. `ens33`, `ens34`, `ens160`) — you'll need it in Step 2.2 to replace `ens33` in the netplan config.
+- **Don't try to fix DHCP** — leave it as is. We set a static IP after install in Step 2.2.
 - Tab to **[Done]** → **Enter**.
+- If a "Continue without network?" prompt appears → **[Continue without network]** → Enter.
 
-> 💡 If install hangs here for 2+ minutes waiting for DHCP, just Tab to [Done] anyway — install will continue.
+> 💡 The interface name varies by VMware hardware version + BIOS — `ens33` / `ens34` / `ens160` are all normal. Whatever name appears, use that exact name everywhere `ens33` is mentioned in Step 2.2.
+
+> 💡 If install hangs here for 2+ minutes waiting for DHCP, just Tab to [Done] anyway — install will continue offline.
 
 **Screen 7 — Configure proxy**
 - Leave blank.
@@ -168,15 +172,26 @@ cms-target login: _
 After OS install, log in as root:
 
 **Ubuntu:**
+
+First, confirm your interface name:
+```bash
+ip link show
+```
+Look for the line that's NOT `lo` — example output:
+```
+2: ens34: <BROADCAST,MULTICAST,UP,LOWER_UP> ...
+```
+Note your actual name (here `ens34`). It might be `ens33`, `ens34`, `ens160`, or other. **Use whatever YOUR machine shows** in the YAML below.
+
 ```bash
 sudo nano /etc/netplan/00-installer-config.yaml
 ```
-Replace contents:
+Replace contents (substitute `ens34` with YOUR actual interface name):
 ```yaml
 network:
   version: 2
   ethernets:
-    ens33:
+    ens34:                                # ← change to YOUR interface name
       addresses: [192.168.2.1/24]
       nameservers:
         addresses: [8.8.8.8]
@@ -184,9 +199,19 @@ network:
         - to: default
           via: 192.168.2.254
 ```
+
+Save: **Ctrl+O → Enter → Ctrl+X**.
+
+Apply:
 ```bash
 sudo netplan apply
 ```
+
+Verify:
+```bash
+ip a show ens34                            # ← your interface name
+```
+Should show: `inet 192.168.2.1/24`.
 
 **CentOS:**
 ```bash
