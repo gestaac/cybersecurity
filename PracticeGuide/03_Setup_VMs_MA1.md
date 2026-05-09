@@ -183,10 +183,14 @@ Look for the line that's NOT `lo` — example output:
 ```
 Note your actual name (here `ens34`). It might be `ens33`, `ens34`, `ens160`, or other. **Use whatever YOUR machine shows** in the YAML below.
 
+Open the netplan file in nano:
 ```bash
 sudo nano /etc/netplan/00-installer-config.yaml
 ```
-Replace contents (substitute `ens34` with YOUR actual interface name):
+
+> 💡 **If you see a blank screen after running this** — that's normal. The installer didn't create the file (because DHCP failed), so nano opens an empty new file. Just type the content below.
+
+Type these contents (substitute `ens34` with YOUR actual interface name):
 ```yaml
 network:
   version: 2
@@ -200,10 +204,43 @@ network:
           via: 192.168.2.254
 ```
 
-Save: **Ctrl+O → Enter → Ctrl+X**.
+#### ⚠️ Typing tips (YAML is strict)
+
+If you're typing this manually in nano (not pasting), follow these 3 rules to avoid errors:
+
+1. **NEVER press Tab. Always press the Space bar.** YAML treats tabs as invalid.
+2. **Indent in steps of 2 spaces.** Each level of nesting is exactly 2 spaces deeper than its parent.
+3. **Indent count cheat sheet:**
+
+   | Line | Spaces before first character |
+   |---|---|
+   | `network:` | 0 (column 1, far left) |
+   | `version: 2` | 2 spaces |
+   | `ethernets:` | 2 spaces |
+   | `ens34:` (your interface) | 4 spaces |
+   | `addresses: [192.168.2.1/24]` | 6 spaces |
+   | `nameservers:` | 6 spaces |
+   | `addresses: [8.8.8.8]` (the inner one) | 8 spaces |
+   | `routes:` | 6 spaces |
+   | `- to: default` | 8 spaces, then `-`, then space, then `to:` |
+   | `via: 192.168.2.254` | 10 spaces |
+
+After typing → **Ctrl+O** → **Enter** → **Ctrl+X**.
+
+Verify your file looks right:
+```bash
+cat /etc/netplan/00-installer-config.yaml
+```
+Compare line-by-line with the YAML above. If anything is wrong, re-run `sudo nano /etc/netplan/00-installer-config.yaml` and fix it.
 
 Apply:
 ```bash
+sudo netplan apply
+```
+
+If you see a permissions warning, fix it then re-apply:
+```bash
+sudo chmod 600 /etc/netplan/00-installer-config.yaml
 sudo netplan apply
 ```
 
@@ -211,7 +248,7 @@ Verify:
 ```bash
 ip a show ens34                            # ← your interface name
 ```
-Should show: `inet 192.168.2.1/24`.
+Should show: `inet 192.168.2.1/24 brd 192.168.2.255 scope global ens34`.
 
 **CentOS:**
 ```bash
