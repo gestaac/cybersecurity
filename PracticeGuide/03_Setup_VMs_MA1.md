@@ -52,10 +52,117 @@ Both VMs sit on the **PG-MA1-CMS** port group on the ESXi server with subnet `19
   - **CD/DVD Drive 1:** **Datastore ISO file** → browse to the Ubuntu Server 22.04 OR CentOS Stream 9 ISO you uploaded to the datastore → tick **Connect at power on**
 - Review → **Finish**.
 - Power on the VM → click **Console** to open the install screen.
-- During the OS install:
-  - **Hostname:** `cms-target`
-  - **User:** `competitor` / **Password:** `P@ssw0rd`
-  - **Root password:** `P@ssw0rd`
+
+### Step 2.1.1 — Walk through the Ubuntu Server 22.04 installer (~15 min)
+
+> Beginner notes: navigation is **arrow keys** + **Tab** + **Enter**. The mouse won't work in this text installer. **Space** toggles checkboxes. **Tab** moves between [Done] / [Back] / [Cancel] buttons at the bottom.
+
+**Screen 1 — GRUB boot menu** (5-second countdown)
+- Just wait, or press **Enter** on `Try or Install Ubuntu Server`.
+
+**Screen 2 — Language**
+- Highlight `English` → **Enter**.
+
+**Screen 3 — Installer update available?** (may or may not appear)
+- Pick **Continue without updating** → **Enter**. *(We don't have internet access from this VLAN, and we don't need updates.)*
+
+**Screen 4 — Keyboard configuration**
+- Layout: `English (US)` — leave default.
+- Variant: `English (US)` — leave default.
+- Tab to **[Done]** → **Enter**.
+
+**Screen 5 — Choose type of install**
+- Highlight **Ubuntu Server** (NOT "Ubuntu Server (minimized)" — we want the full one).
+- Tab to **[Done]** → **Enter**.
+
+**Screen 6 — Network connections**
+- You'll see one entry: `ens160 eth -` (or `ens33`) showing it's trying to get DHCP and probably failing (since PG-MA1-CMS has no DHCP server).
+- **Don't worry** — leave it as DHCPv4. We'll set static IP after install in Step 2.2.
+- Tab to **[Done]** → **Enter**.
+
+> 💡 If install hangs here for 2+ minutes waiting for DHCP, just Tab to [Done] anyway — install will continue.
+
+**Screen 7 — Configure proxy**
+- Leave blank.
+- Tab to **[Done]** → **Enter**.
+
+**Screen 8 — Configure Ubuntu archive mirror**
+- Leave default (`http://archive.ubuntu.com/ubuntu`).
+- Tab to **[Done]** → **Enter**.
+
+**Screen 9 — Guided storage configuration**
+- Leave **Use an entire disk** ticked (default).
+- The disk shown is your 20 GB virtual disk — leave selected.
+- Leave **Set up this disk as an LVM group** ticked.
+- Tab to **[Done]** → **Enter**.
+
+**Screen 10 — Storage configuration (review)**
+- Don't change anything.
+- Tab to **[Done]** → **Enter**.
+
+**Screen 11 — Confirm destructive action**
+- A red box pops up: *"The installer will format the disk."*
+- Tab to **[Continue]** → **Enter**.
+
+**Screen 12 — Profile setup** ← THE IMPORTANT ONE
+- **Your name:** `Competitor`
+- **Your server's name:** `cms-target` ← lowercase, no spaces
+- **Pick a username:** `competitor`
+- **Choose a password:** `P@ssw0rd`
+- **Confirm your password:** `P@ssw0rd`
+- Tab to **[Done]** → **Enter**.
+
+**Screen 13 — Upgrade to Ubuntu Pro**
+- Highlight **Skip for now**.
+- Tab to **[Continue]** → **Enter**.
+
+**Screen 14 — SSH Setup**
+- ✅ **Press Space to tick `Install OpenSSH server`** (so we can SSH in later from Kali).
+- Leave **Import SSH identity** as `No`.
+- Tab to **[Done]** → **Enter**.
+
+**Screen 15 — Featured Server Snaps**
+- **Don't select anything** — we install LAMP manually.
+- Tab to **[Done]** → **Enter**.
+
+**Screen 16 — Installing the system** (5–10 min wait)
+- A green log scrolls. The installer downloads/installs base packages.
+- When done, the bottom button changes from `Cancel update and reboot` to **[Reboot Now]**.
+- Tab to **[Reboot Now]** → **Enter**.
+
+**Screen 17 — "Please remove the installation medium"**
+- The VM tries to reboot but stalls because the ISO is still mounted.
+
+> ⚠️ **EJECT THE ISO HERE — important step:**
+> 1. Don't close the console.
+> 2. Switch to the ESXi UI tab in your browser.
+> 3. CMS-Target VM → **Edit** (top button).
+> 4. Find **CD/DVD Drive 1** → **uncheck "Connect at power on"** AND change dropdown from "Datastore ISO file" to **"Host device"** (or just disconnect).
+> 5. Click **Save**.
+> 6. Switch back to the VM console → press **Enter** → reboot continues.
+
+**Screen 18 — GRUB after reboot**
+- 5-second countdown → boots Ubuntu.
+
+**Screen 19 — Login prompt**
+```
+cms-target login: _
+```
+- Type `competitor` → Enter
+- Password: `P@ssw0rd` → Enter (won't show as you type — that's normal)
+- You see a shell prompt: `competitor@cms-target:~$`
+
+**You're done with the installer.** Continue to Step 2.2 to set the static IP.
+
+### Common Ubuntu installer issues
+
+| Problem | Fix |
+|---|---|
+| Installer keyboard doesn't respond | Click inside the VM console window first (gives it focus). Press **Ctrl+Alt** to release mouse afterwards. |
+| Stuck at "waiting for DHCP" for 5+ minutes | Tab to **[Done]** anyway — install continues without internet. |
+| Install screen freezes mid-way | ESXi → VM → Power → **Reset**. Re-mount ISO if needed. |
+| After reboot it boots installer again instead of OS | The ISO is still mounted. Edit VM → CD/DVD → uncheck Connect at power on → Save → reset VM. |
+| Login fails — "Login incorrect" | The `c` you typed might have been Caps Lock'd. Confirm Caps Lock is OFF. Username + password are case-sensitive. |
 
 ### Step 2.2 — Set static IP `192.168.2.1`
 After OS install, log in as root:
