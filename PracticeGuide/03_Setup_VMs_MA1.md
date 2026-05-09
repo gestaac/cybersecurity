@@ -302,6 +302,32 @@ sudo nmcli con up ens160
 
 > If you have NO gateway in this practice net, omit the route line. Connectivity to internet is needed only during the install of Drupal — afterwards the VM works isolated.
 
+### Step 2.2.5 — Give the VM temporary internet (REQUIRED before Step 2.3)
+
+🚨 **Do NOT skip this step.** Your VM is currently on `PG-MA1-CMS` which has no internet — `apt update` and `wget` will both fail. You'll see:
+
+```
+W: Some index files failed to download. They have been ignored, or old ones used instead.
+W: Failed to fetch http://archive.ubuntu.com/...
+```
+
+**Fix:** before running Step 2.3, follow **`09_Temporary_Internet_For_VMs.md`** to:
+1. Create the `PG-TempInternet` port group (one-time, ~2 min).
+2. Switch CMS-Target's NIC from `PG-MA1-CMS` to `PG-TempInternet`.
+3. Switch the VM's netplan from static `192.168.2.1` to DHCP (`dhcp4: true`).
+4. Verify internet works (`ping 8.8.8.8`).
+
+When `ping 8.8.8.8` returns 3 replies, come back here and run Step 2.3.
+
+After Step 2.3 + Step 2.4 + Step 2.5 + Step 2.6 are done (= LAMP + Drupal + weak user + privesc path), follow **`09_…` Stage F + G** to switch back:
+1. Restore the static netplan (`192.168.2.1/24`, gateway `192.168.2.254`).
+2. Power off the VM.
+3. Switch the NIC back to `PG-MA1-CMS` in ESXi UI.
+4. Power on.
+5. Snapshot as `cms-target-vulnerable`.
+
+This way the VM's "competition starting state" is sealed on the isolated practice subnet — exactly like at the actual competition.
+
 ### Step 2.3 — Install LAMP stack + Drupal 7
 
 ```bash

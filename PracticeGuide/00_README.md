@@ -163,6 +163,7 @@ Sum K-values across completed steps = your raw score per criterion (max 25 each,
 | `06_Setup_VulnHub.md` | Download + import recommended VulnHub VMs |
 | `07_Setup_SecurityOnion.md` | **Security Onion 2.4 install** (Day 2 IR/Forensics platform) |
 | `08_Setup_Workstations_HostOS.md` | Windows host prep + browser + SSH + snapshots + backups |
+| `09_Temporary_Internet_For_VMs.md` | **Helper:** how to give an isolated-port-group VM temporary internet (for `apt install`, `dnf install`, Windows Updates, Drupal download, etc.) and switch back when done |
 
 ### Day-by-day deliverables (repeat as practice)
 | File | Day | Topic |
