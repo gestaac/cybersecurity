@@ -285,7 +285,7 @@ Follow `02_…` **Section B steps 1–5** to create:
 - vSwitch + port group `PG-LAN`
 - vSwitch + port group `PG-DMZ`
 - vSwitch + port group `PG-Servers`
-- vSwitch + port group `PG-MA1-LAN`
+- vSwitch + port group `PG-MA1-CMS`
 
 **Promiscuous mode (optional):** if you ever want to capture traffic with Wireshark from a VM that needs to see other VMs' packets:
 - *Port Group → Edit settings → Security* → set **Promiscuous mode = Accept**.
@@ -343,7 +343,7 @@ Before declaring the ESXi server "ready", confirm all:
 - [ ] PC1 can `ping 192.168.1.10` — replies
 - [ ] PC1 browser opens `https://192.168.1.10/ui` and you can log in as `root`
 - [ ] *Storage → Datastores* shows at least one datastore with ~200 GB free
-- [ ] *Networking → Port groups* shows the 5 port groups (PG-Internet, PG-LAN, PG-DMZ, PG-Servers, PG-MA1-LAN)
+- [ ] *Networking → Port groups* shows the 5 port groups (PG-Internet, PG-LAN, PG-DMZ, PG-Servers, PG-MA1-CMS)
 - [ ] (Optional) Promiscuous mode set to **Accept** on any port group you'll capture from with Wireshark
 - [ ] You took a note of the root password in the team's password file
 - [ ] You set "Power on after AC loss" in BIOS so the server auto-recovers

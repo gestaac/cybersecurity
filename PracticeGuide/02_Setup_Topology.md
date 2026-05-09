@@ -168,9 +168,9 @@ Same.
 #### Step 4 — Create vSwitch4 (Servers) + port group `PG-Servers`
 Same.
 
-#### Step 5 — Create vSwitch5 (MA1) + port group `PG-MA1-LAN`
+#### Step 5 — Create vSwitch5 (MA1) + port group `PG-MA1-CMS`
 **Why:** MA1 (per the actual MA1 PDF) uses `192.168.2.0/24` for the CMS pentest target + Kali — keep on its own port group so you can power MA1 + MA2 separately.
-**Clicks:** Name: `vSwitch-MA1`, port group: `PG-MA1-LAN`, VLAN 0.
+**Clicks:** Name: `vSwitch-MA1`, port group: `PG-MA1-CMS`, VLAN 0.
 
 ### Final port-group inventory
 
@@ -180,7 +180,7 @@ Same.
 | `PG-LAN` | pfSense LAN, Client1, Client2 |
 | `PG-DMZ` | pfSense DMZ, LinSRV1 |
 | `PG-Servers` | pfSense Servers, WinSRV1, WinSRV3, WinSRV4 |
-| `PG-MA1-CMS` (was `PG-MA1-LAN` in older docx) | CMS pentest target + Kali (per MA1 PDF Table 1) |
+| `PG-MA1-CMS` | CMS pentest target + Kali (per MA1 PDF Table 1) |
 | Default `VM Network` | only used to give VMs initial internet access during install (then disconnect) |
 
 ---
@@ -321,7 +321,7 @@ Your current plan = **bare minimum**, which is fine for everything below.
 - [ ] PC1 + PC2 each have a DHCP IP from the router (`ipconfig` shows `192.168.1.10x`)
 - [ ] From PC1: `ping 192.168.1.10` (ESXi) replies; `ping 8.8.8.8` (internet) replies
 - [ ] From PC1: browser opens `https://192.168.1.10/ui` and you can log in as `root`
-- [ ] All five ESXi port groups created (PG-Internet, PG-LAN, PG-DMZ, PG-Servers, PG-MA1-LAN) — see Section B above
+- [ ] All five ESXi port groups created (PG-Internet, PG-LAN, PG-DMZ, PG-Servers, PG-MA1-CMS) — see Section B above
 - [ ] You understand which port group each VM should sit on (Section C)
 
 If yes → next file: `03_Setup_VMs_MA1.md`.
