@@ -34,17 +34,39 @@ The **spreadsheet** has a 4-day skeleton:
 - Day 3: Criterion C — "ODD Flags" + "Cache-Cache Flags" (CTF-style names)
 - Day 4: Criterion D — "Blueday Flags" (CTF-style names)
 
-### ⚠️ The spreadsheet's 4-day skeleton doesn't match reality
+### ✅ Reality confirmed by chief Marlon: 3-day competition
 
-**Confirmed competition structure (per chief Marlon):** 3 days, not 4.
-
-| Day in spreadsheet | Reality at competition |
+| Day in spreadsheet | Confirmed reality at competition |
 |---|---|
-| Day 1 (MA1+MA2 = Crit A) | **Day 1 = MA1 (CMS pentest only)** — `testpacakge_pdf/WSA2025_TP54_MA1_*.pdf` |
-| Day 2 (Lyon CTF flag names) | **Day 2 = MA2 (Security Hardening)** — `testpacakge_pdf/WSA2025_TP54_MA2_*.pdf`. The MA2 PDF IS the Day 2 module Marlon mentioned; the Lyon flag-name rows are placeholders. |
-| Day 3 + Day 4 (Lyon CTF flag names) | **Day 3 = CTF** — random-pick from VulnHub + Juice Shop. Just 1 day, not 2. |
+| Day 1 = Crit A (MA1+MA2) | **Day 1 = MA1 only (CMS pentest)** — `testpacakge_pdf/WSA2025_TP54_MA1_*.pdf` |
+| Day 2 = Crit B (Lyon CTF flag names) | **Day 2 = MA2 (Security Hardening)** — `testpacakge_pdf/WSA2025_TP54_MA2_*.pdf`. ⚠️ Possibly + a Security Onion / SOC module (chief mentioned but not confirmed — see Open Questions below) |
+| Day 3 = Crit C (Lyon CTF flags) | **Day 3 = CTF (combined)** — random-pick from VulnHub + Juice Shop |
+| Day 4 = Crit D (Lyon CTF flags) | ❌ **No Day 4. Crit D marks are now part of Day 3** (chief explicitly confirmed: "no task from Day 4, it will be Day 3 already") |
 
-The marking-scheme **K-values still total 25 per criterion = 100 overall**. The chief will likely rebalance row names before competition; until then the K totals are still meaningful.
+**The 25 marks of Crit D ("Blueday Flags" / CS Flags) are still earnable** — they just shift into Day 3's CTF work alongside Crit C. So Day 3 effectively carries **~50 marks** (Crit C 25 + Crit D 25).
+
+### Confirmed mark distribution per day (3-day model)
+
+| Day | Source criteria | Marks |
+|---|---|---|
+| Day 1 (MA1 pentest) | Crit A1 | ~6 |
+| Day 2 (MA2 hardening) | Crit A2–A8 + Crit B (will be redistributed by chief) | ~19 + 25 = ~44 |
+| Day 3 (CTF — Red + Blue combined) | Crit C + Crit D | ~25 + 25 = ~50 |
+| **Total** | | **~100** |
+
+K-values still total 100 overall. The chief will likely revise the marking scheme row names before competition to match the actual ASEAN deliverables.
+
+### Open Questions (still pending chief's clarification)
+
+1. **Day 2 — MA2 only, or MA2 + Security Onion?**
+   - Marlon's earlier message said *"may mga setup doon na need internet yung sa OpenVPN and Security Onion"*
+   - MA2 PDF only mentions OpenVPN + Snort, not Security Onion
+   - Crit B title (*"Cyber Security Incident Response, Digital Forensics, Application Security"*) fits a SOC module
+   - **Pending:** ask Marlon directly — *"Sir, sa Day 2, kasama na po ba sa MA2 PDF lahat, or may separate Security Onion / SOC setup?"*
+
+2. **Crit B redistribution** — the 25 marks of Crit B (HO/CM Flag rows) need to be reassigned to actual deliverables. Either:
+   - All to MA2 deliverables (if no Security Onion)
+   - Split between MA2 + Security Onion (if both required on Day 2)
 
 ### Why the discrepancy exists
 
@@ -202,46 +224,159 @@ When the chief releases the official **Day 2 deliverables doc** and the **ASEAN 
 
 ---
 
-## Criterion B — Day 2 (Max 25) — MA2 Security Hardening (per MA2 PDF)
+## Criterion B — Day 2 (Max 25) — Cyber Security Incident Response, Digital Forensics, Application Security
 
-> ✅ **MA2 PDF IS the Day 2 module** (chief confirmed). The Lyon-leftover row names (HO Flags, Casual Malware Flags) in the spreadsheet don't match the actual MA2 deliverables, but K-totals still sum to 25. The chief will likely rebalance row names before competition; meanwhile the MA2 PDF is the source of truth for what to do.
+> 🚨 **CORRECTION (2026-05-09):** The spreadsheet row 19 explicitly names Crit B as **"Cyber Security Incident Response, Digital Forensics, Application Security"**. This is **NOT** MA2 hardening — MA2 is part of Criterion A (A2-A8). Crit B is a separate Day-2 IR/Forensics/AppSec module covered by `40_…`, `41_…`, `42_…` and uses **Security Onion** (built per `07_…`).
+>
+> The Lyon-style row names (HO/CM Flags) ARE the actual flag-style challenge format — each flag has H1/H2 hint bonuses. The marking is per-flag (Got it Y/N + bonus K-marks for not using hints).
 
-| Lyon-leftover row | K placeholder | Actual MA2 deliverable | Solved by following |
-|---|---|---|---|
-| HO-01 to HO-07 (with H1/H2 bonuses) | ~13.0 | pfSense rules + OpenVPN + Snort + AD GPOs (lockout, certenroll, autolock, restrict CP, disable add/remove) | `20_…`, `22_…` |
-| CM-01 to CM-08 (with H1/H2 bonuses) | ~12.0 | LinSRV1 hardening + PKI completion + share/audit + functional verification from clients | `21_…`, `23_…`, `30_…` |
-| **Criterion B total (paper)** | **25.0** | | |
+### Day 2 (chief's restructure) actually contains BOTH
 
-Track each MA2 deliverable as: ☐ done / ☐ verified-from-client / time / notes.
+| Component | Maps to | Marks |
+|---|---|---|
+| MA2 hardening (firewall, AD, PKI, LinSRV1, clients) | Crit A2–A8 (rows 47–126) | ~19.4 K |
+| IR + Forensics + AppSec (Security Onion + flag challenges) | **Crit B** (rows 130–167) | 25 K |
+| **Day 2 total** | | **~44 K** |
+
+### B1 — "HO Flags" — Forensics-style hide-and-seek (rows 131–148)
+
+Per row 19 spreadsheet title: these are Digital Forensics flags. Build skills via `40_Day2_IR_Forensics.md`.
+
+| Row | Flag ID | Base K | +No H1 | +No H2 | Max | Solved in |
+|---|---|---|---|---|---|---|
+| D131 | HO-01 | 0.84 | 0.21 | 1.04 | 2.09 | `40_…` Walkthrough 1–3 |
+| D134 | HO-02 | 0.28 | 0.07 | 0.34 | 0.69 | `40_…` |
+| D137 | HO-03 | 0.42 | 0.10 | 0.52 | 1.04 | `40_…` |
+| D140 | HO-04 | 0.97 | 0.24 | 1.22 | 2.43 | `40_…` |
+| D143/D144 | HO-05a/b | 1.63 + 1.50 | — | — | 3.13 | `40_…` |
+| D145/D146 | HO-06a/b | 1.78 + 1.00 | — | — | 2.78 | `40_…` (advanced) |
+| D147/D148 | HO-07a/b | 1.78 + 1.00 | — | — | 2.78 | `40_…` (advanced) |
+| **B1 subtotal (max with no hints)** | | | | | **~13 K** | |
+
+### B2 — "Casual Malware Flags" — Malware analysis + IR (rows 150–167)
+
+Build skills via `41_Day2_MalwareIR.md`.
+
+| Row | Flag ID | Base K | +No H1 | +No H2 | Max | Solved in |
+|---|---|---|---|---|---|---|
+| D150 | CM-01 | 0.28 | 0.07 | 0.34 | 0.69 | `41_…` Walkthrough 1 |
+| D153 | CM-02 | 0.83 | 0.21 | 1.04 | 2.08 | `41_…` |
+| D156 | CM-03 | 0.42 | 0.10 | 0.52 | 1.04 | `41_…` |
+| D159 | CM-04 | 0.28 | 0.07 | 0.34 | 0.69 | `41_…` |
+| D162 | CM-05 | 1.25 | 0.14 | — | 1.39 | `41_…` |
+| D164 | CM-06 | 1.57 | 0.17 | — | 1.74 | `41_…` (medium) |
+| D166 | CM-07 | 1.04 | — | — | 1.04 | `41_…` |
+| D167 | CM-08 | 1.39 | — | — | 1.39 | `41_…` (advanced) |
+| **B2 subtotal (max with no hints)** | | | | | **~12 K** | |
+
+### Where AppSec fits
+
+The **"Application Security"** part of Crit B's title doesn't have its own dedicated rows in the spreadsheet — it's likely embedded in some HO/CM challenges that test web-app exploitation against a vulnerable target. Coverage in `42_Day2_AppSec.md`.
+
+### B grand total
+| | K |
+|---|---|
+| B1 (HO Flags) | ~13.0 |
+| B2 (CM Flags) | ~12.0 |
+| **Crit B total** | **25.0** |
+
+> ⚠️ **Strategy:** every flag has up to 2× its base value as hint-avoidance bonuses. Practice WITHOUT hints. Burning hint H2 typically loses more than the base value of finding the flag.
 
 ---
 
-## Criterion C+D — Day 3 (Max 50) — CTF: VulnHub random pick + Juice Shop
+## Criterion C — Day 3 Red CTF (Max 25) — Offensive: ODD + Cache-Cache
 
-> Per chief: **Day 3 is CTF only**. Random-pick from VulnHub, plus Juice Shop. The marking scheme has 50 marks split across Crit C (25) + Crit D (25), but functionally it's all one CTF day.
+> Per chief: **Day 3 is CTF combined**. Crit C = Red side (offensive — exploitation, web, crypto, pwn). Crit D = Blue side (defensive — covered separately below).
 
-| Lyon-leftover row | K placeholder | Actual likely target | Solved by following |
+### C1 — "ODD Flags" — Offensive challenges (rows 172–200)
+
+Coverage in `50_Day3_CTF_Playbook.md`, `51_Day3_VulnHub_BootToRoot.md`, `52_Day3_CTF_Advanced.md`.
+
+| Row | Flag ID | Base K | +No H1 | +No H2 | Max | Solved in |
+|---|---|---|---|---|---|---|
+| D172 | ODD-01 | 0.28 | 0.07 | 0.34 | 0.69 | `50_…` |
+| D175 | ODD-02 | 0.56 | 0.14 | 0.69 | 1.39 | `51_…` |
+| D178 | ODD-03 | 0.56 | 0.14 | 0.69 | 1.39 | `51_…` |
+| D181 | ODD-04 | 0.97 | 0.24 | 1.22 | 2.43 | `51_…` |
+| D184 | ODD-05 | 0.42 | 0.10 | 0.52 | 1.04 | `51_…` |
+| D187 | ODD-06 | 0.42 | 0.10 | 0.52 | 1.04 | `52_…` |
+| D190 | ODD-07 | 0.62 | 0.07 | — | 0.69 | `52_…` |
+| D192 | ODD-08 | 1.25 | 0.14 | — | 1.39 | `52_…` |
+| D194/D195/D196 | ODD-09a/b/H | 1.50 + 1.00 + 0.28 | — | — | 2.78 | `52_…` |
+| D197 | ODD-10 | 1.74 | — | — | 1.74 | `52_…` |
+| D198 | ODD-11 | 1.04 | — | — | 1.04 | `52_…` |
+| D199/D200 | ODD-12a/b | 1.43 + 1.00 | — | — | 2.43 | `52_…` |
+| **C1 subtotal (max with no hints)** | | | | | **~17.5 K** | |
+
+### C2 — "Cache-Cache" Flags (rows 202–206)
+
+| Row | Flag ID | Base K | Solved in |
 |---|---|---|---|
-| ODD Flag 01–12 (Crit C, ~17.5 K) | 17.5 | Mid VulnHub VM (DC-1, DC-2, Mr. Robot, Basic Pentesting 1) — user shell + root + per-stage flags | `51_…` boot-to-root, `52_…` Walkthroughs 2–4 |
-| Cache-Cache Flag 01–03 (Crit C, ~7.5 K) | 7.5 | Juice Shop ★1–★4 (login admin, reset Jim, UNION SQLi, JWT, vulnerable lib) | `50_…`, `51_…` Section X |
-| CS-01 to CS-15 (Crit D, 25 K) | 25.0 | Harder VulnHub (DC-3+, Kioptrix, Sunset) OR Juice Shop ★5–★6 (Forged JWT, SSRF, XXE, Premium Paywall) | `52_…` advanced walkthroughs |
-| **Crit C+D total** | **50.0** | | |
+| D202 | CC-01 | 1.74 | `50_…` Juice Shop |
+| D203/D204 | CC-02a/b | 1.43 + 1.00 | `51_…` |
+| D205/D206 | CC-03a/b | 1.78 + 1.00 | `52_…` |
+| **C2 subtotal** | | **~7.5 K** | |
 
-> When chief releases the actual ASEAN flag → target mapping (closer to competition day), replace the placeholder rows above with the real flag IDs.
+### Crit C grand total
+| | K |
+|---|---|
+| C1 (ODD Flags) | 17.5 |
+| C2 (CC Flags) | 7.5 |
+| **Crit C total** | **25.0** |
+
+---
+
+## Criterion D — Day 4 (collapsed into Day 3) — Blue CTF (Max 25)
+
+> 🚨 **Spreadsheet says Day 4** but chief explicitly confirmed **Day 4 collapses into Day 3**. The 25 K of Crit D shifts into Day 3 alongside Crit C.
+
+> Crit D = "Blueday Flags" / CS-prefix = **Blue-side defensive CTF** (PCAP analysis, memory forensics, log triage, malware classification). Coverage: `53_Day3_BlueCTF.md`.
+
+| Row | Flag ID | Base K | +No H1 | +No H2 | Max | Solved in |
+|---|---|---|---|---|---|---|
+| D211 | CS-01 | 0.54 | 0.13 | 0.66 | 1.33 | `53_…` Walkthrough 1 |
+| D214 | CS-02 | 0.87 | 0.22 | 1.10 | 2.19 | `53_…` Walkthrough 1 |
+| D217 | CS-03 | 0.69 | 0.18 | 0.88 | 1.75 | `53_…` Walkthrough 1 |
+| D220 | CS-04 | 0.35 | 0.09 | 0.44 | 0.88 | `53_…` Walkthrough 4 |
+| D223 | CS-05 | 0.35 | 0.09 | 0.44 | 0.88 | `53_…` Walkthrough 4 |
+| D226 | CS-06 | 1.97 | 0.22 | — | 2.19 | `53_…` Walkthrough 2 |
+| D228/D229/D230 | CS-07a/b/H | 1.18 + 1.18 + 0.26 | — | — | 2.62 | `53_…` Walkthrough 2 |
+| D231 | CS-08 | 1.97 | 0.22 | — | 2.19 | `53_…` Walkthrough 3 |
+| D233 | CS-09 | 1.19 | 0.13 | — | 1.32 | `53_…` Walkthrough 3 |
+| D235 | CS-10 | 1.75 | — | — | 1.75 | `53_…` Walkthrough 5 |
+| D236 | CS-11 | 0.88 | — | — | 0.88 | `53_…` Walkthrough 5 |
+| D237 | CS-12 | 1.32 | — | — | 1.32 | `53_…` Walkthrough 6 |
+| D238/D239 | CS-13a/b | 1.19 + 1.00 | — | — | 2.19 | `53_…` advanced |
+| D240/D241 | CS-14a/b | 1.19 + 1.00 | — | — | 2.19 | `53_…` advanced |
+| D242 | CS-15 | 1.32 | — | — | 1.32 | `53_…` advanced |
+| **Crit D total (max)** | | | | | **~25 K** | |
+
+> ⚠️ **The H2 bonuses on most CS flags are LARGER than the base.** Practice without hints. Skip a flag rather than burn an H2 on a flag whose base is < 0.5.
+
+---
+
+## Combined Day 3 (Crit C + Crit D) — practice strategy
+
+| Aspect | Crit C (Red) | Crit D (Blue) |
+|---|---|---|
+| Marks | 25 | 25 |
+| Member | A (Pentest Lead) | B (Hardening Lead) |
+| Tools | Burp, sqlmap, msf, nmap | Wireshark, vol, Autopsy, Hayabusa |
+| Practice file | `50_…`, `51_…`, `52_…` | `53_…` |
+| Time per flag | ~20 min | ~25 min |
+| Hint strategy | Aggressive solving, never use H1/H2 | Same |
 
 ---
 
 ## Grand total
 
-| Criterion | Day | Max | Your score |
+| Criterion | Day in chief's restructure | Max | Your score |
 |---|---|---|---|
-| A — MA1 (CMS pentest) + MA2 (Hardening) | 1 + 2 | 25 | __ |
-| B — MA2 deliverables (overlapping w/ A2–A8) | 2 | 25 | __ |
-| C — Day 3 CTF | 3 | 25 | __ |
-| D — Day 3 CTF advanced | 3 | 25 | __ |
+| A — Enterprise Infrastructure Security (MA1 + MA2) | Day 1 (MA1) + Day 2 morning (MA2) | 25 | __ |
+| B — IR + Forensics + AppSec (Security Onion) | Day 2 afternoon | 25 | __ |
+| C — Red CTF (offensive) | Day 3 morning | 25 | __ |
+| D — Blue CTF (defensive) | Day 3 afternoon | 25 | __ |
 | **Total** | | **100** | __ |
-
-> ⚠️ The marking scheme overlaps Crit A and Crit B in covering MA2 work (since both reference MA2 deliverables). The chief will likely rebalance these. Aim to complete every MA2 deliverable cleanly — it scores under whichever criterion the rebalanced scheme uses.
 
 ---
 
@@ -249,11 +384,17 @@ Track each MA2 deliverable as: ☐ done / ☐ verified-from-client / time / note
 
 | Defect in marking scheme | Mitigation |
 |---|---|
-| Day-of-Marking column has 4 days; actual competition is 3 days | Practice covers all 3 days; the Day 4 row is Lyon-leftover |
-| All B/C/D flag names (HO/CM/ODD/CC/CS) are Lyon-leftover | Per MA1+MA2 PDFs and chief confirmation: Day 1 = MA1 pentest, Day 2 = MA2 hardening, Day 3 = CTF |
-| Marking scheme rows haven't been re-aligned to MA1/MA2 PDFs yet | The chief will likely publish a revised marking scheme before competition. K-totals (25 per criterion, 100 total) still hold. |
-| Older docx version of marking scheme had banner = "WorldSkills Lyon" | The MA2 PDF says **"WorldSkills ASEAN Manila"** — type this exactly per `22_…` Step 3. |
-| MA1 PDF tasks (Information Gathering / CMS Vuln / System Weaknesses / Report) don't map 1:1 to the 4 Lyon Crit-A1 row names | Aim for completing all 4 PDF tasks correctly + a clean 150-word report; total K stays 6.0 |
+| Day-of-Marking column has 4 days; chief confirmed 3-day comp | Day 4 (Crit D) collapses into Day 3 |
+| Row D81 mentions "google GPO" (Chrome homepage) | NOT in MA2 PDF — Lyon-leftover. Skip. |
+| Row D83 says share permissions: `CS=R, Graphics=Mod, IT=FC` | MA2 PDF page 12 actual: `Marketing=R, Executive=FC`. Follow PDF. |
+| Row D97 says login as "Anorbert" | MA2 PDF Table 3 has M001/M002/M003/M004/S001/C1/C2. Use those. |
+| Row D113 says login as "mratt@manila.com" | Use C2 (IT user from Table 3). |
+| Row D119 says banner "WorldSkills Lyon" | MA2 PDF says **"WorldSkills ASEAN Manila"** — type that exactly. |
+| Row D120 says "graphics user" + "france.jpg" / "manila.jpg" | MA2 PDF says Marketing user reads `park.jpg`. |
+| Row D106, D126 say "Christmas / XMAS scan" | MA2 PDF page 10 says **FIN scan** (`flags: F`). Implement FIN. |
+| MA1 marking has only 4 judgment rows for the 4 PDF tasks | The 9 question-answers in MA1 PDF are graded as overall pentest quality, not per-question. Top-2 vulnerabilities + executive summary = full marks. |
+| All B/C/D flag names are Lyon-leftover (HO/CM/ODD/CC/CS prefixes) | The K-values + hint structure are valid. The actual flags will be ASEAN-specific but the per-flag scoring formula stays the same. |
+| Crit B was previously misinterpreted as MA2 hardening | **Corrected 2026-05-09:** Crit B = IR/Forensics/AppSec (per spreadsheet row 19). MA2 = part of Crit A. |
 
 ---
 

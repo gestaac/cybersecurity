@@ -192,7 +192,7 @@ Ports usually 22, 80, 443. **Don't skip /robots.txt** — it leaks Key 1's locat
 **Author:** loneferret / Kioptrix
 **VulnHub link:** `vulnhub.com/entry/kioptrix-level-1-1,22/`
 **Difficulty:** Beginner. Old-school exploits.
-**Network setup:** ⚠️ This VM uses a fixed MAC and may struggle to get DHCP — easier with a small VirtualBox host-only network.
+**Network setup:** ⚠️ This VM uses a fixed MAC and may struggle to get DHCP. On ESXi `PG-CTF`, set the VM's NIC to a known MAC manually (Edit VM → Network adapter → MAC address → Manual) OR install a DHCP server on Kali to lease it an IP.
 
 ### Phase 1–2: Recon
 - Open ports include 22, 80, 111, 139, 443.

@@ -13,63 +13,64 @@ This file gets you ready to download, import, and attack any VulnHub VM. The nex
 
 - A free repository of **virtual-machine images** that are intentionally vulnerable.
 - Format: `.ova` (OVF appliance) or `.zip` containing `.vmx + .vmdk`.
-- Imported into VMware Workstation or VirtualBox.
+- Imported into ESXi (in our setup) — convert from `.vmx` to OVA first if needed (see Part E).
 - Every VM has 1–6 "flags" hidden along the path from initial access to root.
 - Solutions exist on each VM's download page (don't read until after you try).
 
 ---
 
-## Part B — Lab architecture
+## Part B — Lab architecture (ESXi server)
 
-Recommended setup for practice:
+Recommended setup for our 3-PC rig:
 
 ```
-┌──────────────────────────────────────────────┐
-│   VMware Workstation Pro 17 on your laptop    │
-│                                                │
-│   ┌────────────────┐   VMnet1 Host-Only       │
-│   │ Kali Linux     │── 192.168.56.0/24 ──┐    │
-│   │ (attacker)     │                      │    │
-│   └────────────────┘                      │    │
-│                                            │    │
-│   ┌────────────────┐                      │    │
-│   │ VulnHub VM     │── 192.168.56.0/24 ──┘    │
-│   │ (target)       │                           │
-│   └────────────────┘                           │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│   ESXi Server (the 3rd PC)                            │
+│                                                        │
+│   ┌────────────────┐   PG-CTF (isolated port group)   │
+│   │ Kali Linux     │── 10.10.10.0/24 ──────────┐      │
+│   │ (attacker)     │                            │      │
+│   └────────────────┘                            │      │
+│                                                  │      │
+│   ┌────────────────┐                            │      │
+│   │ VulnHub VM     │── 10.10.10.0/24 ──────────┘      │
+│   │ (target)       │                                   │
+│   └────────────────┘                                   │
+└──────────────────────────────────────────────────────┘
+            ▲
+            │ Browser from PC1 → ESXi UI → VM consoles
 ```
 
-**Why Host-Only:**
-- Isolates the deliberately-vulnerable VM from your real network and the internet (some VMs phone home, none should reach anything).
-- Both Kali and target sit on the same private subnet so Kali can scan/attack.
+**Why an isolated port group:**
+- Vulnerable VMs sit on `PG-CTF` so they can't reach pfSense / WINSRV1 / production data on PG-Servers.
+- Both Kali and the target sit on the same `10.10.10.0/24` virtual cable so Kali can scan/attack.
+- No bridge to PC1's real network — vulnerable services are sealed in ESXi.
 
-### Set up the VMware Host-Only network
-1. VMware Workstation → *Edit → Virtual Network Editor*.
-2. Click **Change Settings** (admin prompt).
-3. Select **VMnet1** (Host-Only) → confirm enabled and check the subnet (default `192.168.x.0/24`; commonly `192.168.56.0/24` if you've used it for Vagrant).
-4. Make sure **Use local DHCP service to distribute IP addresses** is ✅ ticked. This lets the target VM grab an IP automatically.
-5. Apply.
+### Create PG-CTF port group on ESXi (one-time)
+1. ESXi UI → **Networking** → **Port groups** → **Add port group**.
+2. **Name:** `PG-CTF`. **VLAN ID:** `0`. **Virtual switch:** any (a separate vSwitch is cleanest, but reusing `vSwitch1` works).
+3. Click **Add**.
 
-> **Warning:** Do **NOT** put VulnHub VMs on Bridged or NAT — some have weak default services that will be discovered by anything on your real LAN.
+> 💡 Alternative: **reuse `PG-MA1-CMS`** (built in `03_Setup_VMs_MA1.md`) for CTF practice. Both are isolated and serve the same purpose.
+
+> **Warning:** Do **NOT** attach VulnHub VMs to PG-LAN, PG-DMZ, or PG-Servers. Their weak services would interfere with your MA2 hardening work.
 
 ---
 
-## Part C — Install Kali Linux as the attacker VM
+## Part C — Kali on ESXi (already done in `03_…`)
 
-1. Download the **Kali Linux Pre-built VMware** image from `https://www.kali.org/get-kali/#kali-virtual-machines`. Pick the 7z or zip → extract.
-2. VMware Workstation → *File → Open* → select the extracted `.vmx`.
-3. After import: VM settings → Network Adapter → **Custom: VMnet1 (Host-Only)**.
-4. Power on. Default credentials: `kali` / `kali`.
-5. First-boot updates:
+You already imported Kali into ESXi per `03_Setup_VMs_MA1.md` Part 3. **Reuse the same Kali VM for CTF.**
+
+To switch Kali between MA1 mode and CTF mode:
+1. ESXi UI → Kali VM → **Edit** → Network adapter → change from `PG-MA1-CMS` to `PG-CTF` (or keep on the same group).
+2. Update Kali's IP if needed:
    ```bash
-   sudo apt update && sudo apt -y full-upgrade
+   sudo nmcli con mod "Wired connection 1" ipv4.addresses 10.10.10.2/24 ipv4.method manual
+   sudo nmcli con up "Wired connection 1"
    ```
-6. Verify Kali got a Host-Only IP:
-   ```bash
-   ip a | grep 192.168
-   ```
-   Should show something like `192.168.56.128/24`.
-7. **Snapshot Kali clean** in VMware (so you can roll back after experiments).
+3. Snapshot as `kali-ctf-ready`.
+
+> 💡 If you'd rather keep them separate, **clone Kali in ESXi** (Snapshot → Clone) and use the clone for CTF only.
 
 ---
 
@@ -89,28 +90,39 @@ Recommended setup for practice:
 
 ---
 
-## Part E — Import a VulnHub VM into VMware Workstation
+## Part E — Import a VulnHub VM into ESXi
 
-### For `.ova` files
-1. VMware Workstation → *File → Open* → select the `.ova`.
-2. Name + storage path → *Import*.
-3. If "OVF specification compliance" warning → click **Retry**.
-4. After import: **Edit virtual machine settings → Network Adapter → Custom: VMnet1 (Host-Only)**.
-5. Power on the VM.
+### Step E.1 — Upload the .ova to ESXi datastore
+1. ESXi UI → **Storage** → **Datastore browser** → **Upload**.
+2. Select your `.ova` file. Wait for upload (5–15 min depending on file size and your network).
 
-### For `.zip` containing `.vmx`
-1. Extract the `.zip` to a folder.
-2. VMware Workstation → *File → Open* → select the `.vmx`.
-3. When VMware asks "I copied it" vs "I moved it" → choose **I copied it** (regenerates UUID/MAC).
-4. Settings → Network Adapter → **VMnet1 (Host-Only)**. Save.
-5. Power on.
+### Step E.2 — Deploy from OVA
+1. ESXi UI → **Virtual Machines** → **Create / Register VM** → **Deploy a virtual machine from an OVF or OVA file**.
+2. Name the VM (e.g., `DC-1`), browse to the uploaded `.ova` from the datastore.
+3. Pick datastore → next.
+4. **Network mappings:** point all networks → **PG-CTF**.
+5. Disk thin → next → finish.
 
-### Common import gotchas
+### Step E.3 — For `.zip` containing `.vmx` (need conversion first)
+ESXi cannot directly import VMware Workstation `.vmx` files — convert them to `.ova` first.
+
+On PC1 (with internet):
+1. Download VMware OVF Tool: `https://developer.vmware.com/web/tool/4.6.0/ovf` (free).
+2. Install → opens a Command Prompt where you can run `ovftool.exe`.
+3. Convert:
+   ```cmd
+   "C:\Program Files\VMware\VMware OVF Tool\ovftool.exe" target.vmx target.ova
+   ```
+4. Upload the resulting `.ova` to the ESXi datastore (Step E.1) → deploy normally (Step E.2).
+
+> 💡 **Pre-build all VulnHub OVAs locally before competition** — convert + upload them once during practice week. On competition day no internet = no conversion possible.
+
+### Common import gotchas (ESXi)
 | Symptom | Cause | Fix |
 |---|---|---|
-| "Failed to import" | OVA built for newer hardware version | Try VirtualBox import, then re-export as OVF 1.0 |
-| VM boots but stuck at GRUB / kernel panic | EFI vs BIOS mismatch | VM settings → *Options → Advanced → Firmware type* — toggle BIOS ↔ UEFI |
-| No IP shown on the VM console | DHCP not running on VMnet1, or VM hard-coded a different subnet | Enable DHCP on VMnet1 (Part B step 4); or check VM author notes |
+| "OVF descriptor invalid" or hardware-version error | OVA built for newer hardware than ESXi 8 supports | On PC1 use ovftool with `--lax` flag: `ovftool.exe --lax target.ovf target.ova` |
+| VM boots but stuck at GRUB / kernel panic | EFI vs BIOS mismatch | Edit VM → Boot options → Firmware → toggle BIOS ↔ EFI |
+| No IP shown on the VM console | The VM expects a different DHCP subnet | Manually set the VM's NIC IP to be on `10.10.10.0/24`, OR install a DHCP server on Kali |
 | Slow boot | VMware Tools not present (intentional in many CTF VMs) | Ignore — doesn't affect exploitation |
 
 ---
@@ -158,13 +170,13 @@ These are the **most-recommended training VMs**. Practising on them gives you th
 
 ## Part G — Find the VulnHub VM's IP (no DHCP info given!)
 
-Most VulnHub VMs come with DHCP enabled but don't show their IP on the login banner. From Kali (same Host-Only subnet):
+Most VulnHub VMs come with DHCP enabled but don't show their IP on the login banner. From Kali (same `PG-CTF` subnet):
 
 ### Method 1 — netdiscover (fastest)
 ```bash
-sudo netdiscover -i eth0 -r 192.168.56.0/24
+sudo netdiscover -i eth0 -r 10.10.10.0/24
 ```
-Look for an entry with a different vendor than VMware's host (e.g., your VM might appear as "PCS Systemtechnik GmbH" if VBox or "VMware Inc." with an unfamiliar MAC). Press Ctrl+C when found.
+Look for an entry with an unfamiliar MAC. Press Ctrl+C when found.
 
 ### Method 2 — arp-scan
 ```bash
@@ -174,9 +186,13 @@ Lists every host that responded to ARP on the local interface.
 
 ### Method 3 — nmap ping sweep
 ```bash
-sudo nmap -sn 192.168.56.0/24
+sudo nmap -sn 10.10.10.0/24
 ```
 Slowest but most reliable.
+
+> 💡 If the VulnHub VM **doesn't** get a DHCP lease (no DHCP server on `PG-CTF`), you have two options:
+>   1. Install a DHCP server on Kali: `sudo apt install isc-dhcp-server` then configure `/etc/dhcp/dhcpd.conf` with subnet `10.10.10.0/24`.
+>   2. Find the VM's static IP from console boot logs (boot the VM, watch console messages for `eth0: ...`).
 
 > 🚨 If multiple VMs are running, identify the new one by elimination. Note your Kali IP first (`ip a`), then any IP you don't recognise is the target.
 
@@ -188,7 +204,7 @@ Repeat for each VM the first time you boot it, so you confirm everything works:
 
 ```bash
 # 1. find the VM
-sudo netdiscover -i eth0 -r 192.168.56.0/24
+sudo netdiscover -i eth0 -r 10.10.10.0/24
 
 # 2. quick port scan to confirm reachable
 nmap -p 22,80,443 -T4 <ip>
@@ -215,9 +231,9 @@ If you see a web page or services responding — you're ready. **Snapshot the VM
 ## Part J — Build your USB
 
 For competition day, copy these onto your USB:
-- [ ] All VMs from Part F (~50 GB total — use a 64 GB+ USB)
-- [ ] Kali Linux VM image (10 GB)
-- [ ] VMware Workstation installer
+- [ ] All VMs from Part F **converted to .ova format** (~50 GB total — use a 64 GB+ USB)
+- [ ] Kali Linux .ova (10 GB) — same as you imported on ESXi
+- [ ] VMware OVF Tool installer (in case you need to re-convert anything)
 - [ ] HackTricks PDF
 - [ ] PEASS-ng binaries (linpeas.sh, winPEAS.exe)
 - [ ] GTFOBins offline mirror (`git clone https://github.com/GTFOBins/GTFOBins.github.io`)

@@ -277,11 +277,11 @@ sudo apt install -y crackmapexec impacket-scripts smbclient enum4linux \
 ## 7. Pre-flight checklist (tick before moving to `02_Setup_Topology.md`)
 
 ### Day 1 + Day 2 prep (MA1 pentest + MA2 hardening)
-- [ ] VMware Workstation 17 installed + licensed on team PCs
-- [ ] ESXi 8 installed on team server (3-PC mode) OR VMnets configured (single-PC mode per `02b_…`)
-- [ ] All 4 OS ISOs downloaded to `D:\ISO\` (pfSense, CentOS Stream 9, Win Server 2022 Eval, Win 10 Eval)
-- [ ] Chrome, Firefox, PuTTY, WinSCP, Wireshark, Nmap installed
-- [ ] OpenVPN Connect installed (for Client3 dial-in test)
+- [ ] VMware OVF Tool installed on PC1 + PC2 (for OVA conversions before ESXi upload)
+- [ ] ESXi 8 installed on the 3rd PC (the team server) per `02c_Setup_ESXi_Server.md`
+- [ ] All OS ISOs downloaded to `D:\ISO\` on PC1, then uploaded to ESXi datastore (pfSense, CentOS Stream 9, Win Server 2022 Eval, Win 10 Eval, Security Onion 2.4)
+- [ ] Chrome, Firefox, PuTTY, WinSCP, Wireshark, Nmap installed on PC1 + PC2
+- [ ] OpenVPN Connect installed on Client3 VM (for VPN dial-in test)
 
 ### CTF (Juice Shop) prep — see `05_Setup_JuiceShop.md`
 - [ ] Kali Linux VM downloaded
@@ -295,9 +295,9 @@ sudo apt install -y crackmapexec impacket-scripts smbclient enum4linux \
 - [ ] (Optional) Local CTFd running on `http://localhost:8000` with Juice Shop challenges imported
 
 ### CTF (VulnHub boot-to-root) prep — see `06_Setup_VulnHub.md`
-- [ ] VMware Workstation Host-Only network (VMnet1) configured
-- [ ] Kali Linux running on VMnet1, can ping itself
-- [ ] At least 8 VulnHub VMs downloaded to D:\VulnHub\ and verified by hash
+- [ ] ESXi `PG-CTF` port group created (or reuse `PG-MA1-CMS`)
+- [ ] Kali running on PG-CTF, can ping VulnHub target VMs on the same subnet
+- [ ] At least 8 VulnHub VMs downloaded as `.ova` to `D:\OVA\` on PC1, then uploaded to ESXi datastore
   - [ ] Basic Pentesting: 1
   - [ ] Mr. Robot: 1
   - [ ] DC-1, DC-2, DC-3

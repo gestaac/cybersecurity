@@ -21,8 +21,11 @@ For practice, build it to the **same starting point**. Then practice the actual 
 | Client1 | PG-LAN | Win 10 Eval | 2 GB | 40 GB | DHCP |
 | Client2 | PG-LAN | Win 10 Eval | 2 GB | 40 GB | DHCP |
 | Client3 | PG-Internet | Win 10 Eval | 2 GB | 40 GB | DHCP from ISP |
+| **SecOnion** | mgmt: PG-Servers, sniff: PG-MIRROR | Security Onion 2.4 | 8 GB | 200 GB | 192.168.2.20/24 |
 
 > All passwords default `P@ssw0rd`. ESXi credentials per the actual MA2 PDF: `wsauser / Andres@9V4` (IP `192.168.1.1`). Workstation login: `competitor1b / Tagaytay_62&L`.
+
+> 💡 **SecOnion (the 10th VM)** is for **Day 2 afternoon Crit B (IR/Forensics/AppSec, 25 K)**. Build per `07_Setup_SecurityOnion.md`. It needs internet during install (so-setup downloads ~10 GB Docker images + ETOPEN ruleset).
 
 ---
 

@@ -1,20 +1,21 @@
 # 08 — Workstations: Windows Host OS Setup + Best Practices
 
-This file is the **canonical reference** for preparing PC1 and PC2 (or your single practice PC). It consolidates Windows host prep, VMware Workstation Pro preferences, browser/SSH config, snapshot conventions, VM backups, file-share between teammates, and a recovery cookbook.
+This file is the **canonical reference** for preparing **PC1 and PC2** — your two competition workstations. It covers Windows host prep, browser/SSH config, snapshot conventions, VM backups (on ESXi), file-share between teammates, and a recovery cookbook.
 
-> Already partially in `02b_Setup_SinglePC_Practice.md` Sections C–D. This file is the deeper / more comprehensive version. Use this one once your setup is the full 3-PC rig.
+> Our setup: **2 actual PCs + 1 ESXi server**. PC1 + PC2 are thin VM viewers — they connect to the ESXi server's web UI to manage VMs, and they only host light tooling locally (browser, Burp, etc.).
 
-> No marks earned by anything in this file — it's enabling work for everything in `10_…` through `52_…`.
+> No marks earned by anything in this file — it's enabling work for everything in `10_…` through `53_…`.
 
 ---
 
 ## A. When to use this file
 
-| Setup | Read which file |
+| Setup step | Read which file |
 |---|---|
-| Single-PC practice (just one machine, learning) | `02b_Setup_SinglePC_Practice.md` (lighter version) |
-| Two PCs + ESXi server (the actual rig) | **This file** |
-| You want best-practice tips (bookmarks, SSH aliases, snapshot conventions) | **This file** Sections G–N |
+| ESXi server install | `02c_Setup_ESXi_Server.md` (+ `02d_…` if NIC driver needed) |
+| Network rig (TP-Link router + switch + 3 boxes) | `02_Setup_Topology.md` |
+| **Windows host prep on PC1 + PC2** | **This file** Sections B–F |
+| Browser bookmarks, SSH aliases, snapshot conventions | **This file** Sections G–N |
 
 ---
 
@@ -35,24 +36,27 @@ PC1 and PC2 each need (minimum):
 
 ## C. BIOS / UEFI settings (do once per PC)
 
-Same as `02b_…` Section C.1 — entering BIOS varies per motherboard.
+Entering BIOS varies per motherboard (typically Del or F2 at boot).
 
 | Setting | Value | Why |
 |---|---|---|
-| Intel Virtualization Technology / AMD-V (SVM) | **Enabled** | Required for VMware to use hardware acceleration |
+| Intel Virtualization Technology / AMD-V (SVM) | **Enabled** | Required if you ever boot a small local VM (Burp's embedded browser, etc.) |
 | Intel VT-d / AMD-Vi | Enabled (optional) | Future-proofs you for advanced features |
-| Hyper-Threading | Enabled | Extra logical cores for VMs |
+| Hyper-Threading | Enabled | Extra logical cores |
 | Secure Boot | Enabled (default is fine for Windows) | OK for the workstations (unlike ESXi server which needs it OFF) |
 | Boot order | NVMe / SSD first | So Windows boots fast |
-| Fast Boot | Disabled | Causes weird issues with VMware kernel modules |
+| Fast Boot | Disabled | Cleaner boot, fewer driver headaches |
 | Power on after AC loss | Optional | Convenient if power flickers |
 
 ---
 
 ## D. Windows host prep
 
-### D.1 Disable Hyper-V / WSL2 / Memory Integrity (CRITICAL for VMware speed)
-Run **PowerShell as Administrator**:
+### D.1 Disable Hyper-V / WSL2 / Memory Integrity (only if you'll boot local VMs)
+
+PC1 + PC2 are thin clients — most VMs run on ESXi, not locally. **You can SKIP this step** unless you plan to run a Kali / Juice Shop VM locally on PC1 or PC2.
+
+If you DO need local VM hosting, run **PowerShell as Administrator**:
 
 ```powershell
 Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All -NoRestart
@@ -65,16 +69,14 @@ Restart-Computer
 
 Also: *Settings → Privacy & Security → Windows Security → Device Security → Core Isolation → Memory Integrity → Off*. Reboot.
 
-After reboot, verify Task Manager → Performance → CPU shows *Virtualization: Enabled* and **does not** say "A hypervisor has been detected."
+### D.2 Antivirus exclusions (recommended)
 
-### D.2 Antivirus exclusions
-Windows Defender real-time scan on `.vmdk` files cuts disk performance by ~70%.
+Helps if you store ISOs / OVAs locally on PC1/PC2 before uploading to ESXi.
 Settings → Windows Security → Virus & threat protection → Manage settings → Exclusions → Add → **Folder**:
-- `D:\VMware`
-- `D:\ISO`
-- `D:\juice-shop`
-- `D:\VulnHub`
-- `D:\Kali`
+- `D:\ISO` (where you stage OS ISOs before uploading to ESXi datastore)
+- `D:\OVA` (where you stage VulnHub OVAs before uploading)
+- `D:\Tools`
+- `D:\Notes`
 
 ### D.3 Power plan + sleep
 Settings → System → Power → Power mode = **Best performance**.
@@ -94,24 +96,22 @@ Default Windows-managed pagefile is fine **unless** your D: drive is also where 
 
 ```
 D:\
-├── ISO\                    # OS installers
+├── ISO\                    # OS installers (staged before upload to ESXi datastore)
 │   ├── pfSense-CE-2.7.2.iso
 │   ├── CentOS-Stream-9.iso
 │   ├── Win_Server_2022.iso
 │   ├── Win10_Enterprise.iso
 │   └── securityonion-2.4.iso
-├── VMware\                 # local VMs (Kali, optional Juice Shop VM)
-├── VulnHub\                # downloaded .ova files
-├── juice-shop\             # extracted Juice Shop release
-├── Kali\                   # Kali VMware image
+├── OVA\                    # VulnHub + Kali OVA files (staged for ESXi upload)
 ├── PracticeGuide\          # copy of this guide
-├── Tools\                  # offline tool installers
+├── Tools\                  # local tool installers (run on PC1/PC2)
 │   ├── Burp_Community.exe
 │   ├── PuTTY.exe
 │   ├── WinSCP.exe
 │   ├── Wireshark.exe
 │   ├── Nmap.exe
 │   ├── Node20.msi
+│   ├── OVF-Tool.msi        # convert .vmx → .ova for ESXi
 │   ├── Greenshot.exe
 │   ├── LibreOffice.msi
 │   └── linpeas.sh, winPEASany.exe
@@ -121,29 +121,31 @@ D:\
 │   ├── HackTricks_chapters.pdf
 │   ├── GTFOBins\           # cloned from GitHub
 │   └── OWASP_Top10.pdf
-└── Notes\                  # YOUR running scratchpad — gitignored, personal
+└── Notes\                  # YOUR running scratchpad — personal
 ```
 
 Both PCs use **the same paths** so any guide step works on either teammate's box.
 
 ---
 
-## F. VMware Workstation Pro preferences
+## F. VMware OVF Tool (for converting OVAs)
 
-After install (`01_…` Section 1.1), tune these:
+In our setup VMware Workstation Pro is **NOT** the primary VM host — that's the ESXi server. But you'll occasionally need to **convert `.vmx` files to `.ova`** before uploading to ESXi (e.g., the Kali Linux pre-built image, some VulnHub VMs).
 
-*Edit → Preferences*:
+Install OVF Tool on **both PC1 and PC2**:
+1. Download (free): `https://developer.vmware.com/web/tool/4.6.0/ovf`.
+2. Run the installer.
+3. Test:
+   ```cmd
+   "C:\Program Files\VMware\VMware OVF Tool\ovftool.exe" --version
+   ```
+4. Typical use:
+   ```cmd
+   ovftool.exe target.vmx target.ova
+   ```
+5. Upload the resulting `.ova` to ESXi datastore via the **Storage → Datastore browser → Upload** UI.
 
-| Tab | Setting | Value |
-|---|---|---|
-| Workspace | Default location for VMs | `D:\VMware` |
-| Input | Send Ctrl+Alt+Del to VM | choose your shortcut (default works) |
-| Display | Autofit guest | enabled (so VMs scale to window) |
-| Updates | Check for product updates | **disabled** (don't update mid-practice) |
-| Devices | Default removable devices | Disconnected |
-| Memory | Reserved memory | leave at default |
-
-*VMware Workstation main menu → Edit → Virtual Network Editor*: see `02b_…` Section D.2 for VMnet creation if you're using Workstation as primary VM host (single-PC mode).
+> 💡 You don't need the full VMware Workstation Pro installed. OVF Tool alone is enough for this conversion task.
 
 ---
 
@@ -203,11 +205,11 @@ Host winsrv1
     Port 22
 
 Host kali
-    HostName 192.168.56.128
+    HostName 192.168.2.2
     User kali
 ```
 
-> Adjust IPs to match your environment. The `kali` IP comes from netdiscover on VMnet1 host-only.
+> Adjust IPs to match your ESXi environment. The `kali` IP is its static IP on `PG-MA1-CMS` set in `03_Setup_VMs_MA1.md` Step 3.2.
 
 Test: open Command Prompt → `ssh esxi` → password prompt → done.
 
@@ -241,9 +243,10 @@ Examples:
 Snapshots are **not backups** — they live on the same disk.
 
 ### J.1 Periodic OVA exports (do weekly during practice)
-*VMware Workstation: File → Export to OVF* OR *ESXi: Right-click VM → Export*.
-Save the `.ova` to:
-- A **different drive** than the VM lives on, or
+*ESXi UI: Right-click VM → Export* — saves the VM as `.ovf` + `.vmdk` files to your local PC's download folder.
+
+Save the exported files to:
+- A **different drive** than the ESXi datastore (e.g., download to PC1 then copy to external SSD), or
 - An **external SSD** dedicated to backups.
 
 Naming: `<vm>-<state>-YYYYMMDD.ova` e.g. `LinSRV1-hardened-20260507.ova`.
@@ -259,7 +262,7 @@ Naming: `<vm>-<state>-YYYYMMDD.ova` e.g. `LinSRV1-hardened-20260507.ova`.
 - Juice Shop — `npm start` again
 
 ### J.4 Restore test (do once)
-Pick one OVA backup. *File → Open → import the OVA → boot it → confirm it works.* If you've never tested a restore, you don't have a backup.
+Pick one OVA backup. ESXi UI → Create / Register VM → Deploy from OVA → import → boot it → confirm it works. If you've never tested a restore, you don't have a backup.
 
 ---
 
@@ -284,17 +287,16 @@ Use the same Microsoft account on both PCs and let OneDrive sync `D:\Share\`. Av
 
 | Symptom | First thing to try |
 |---|---|
-| VM won't boot | Right-click → *Snapshot → Revert to last good*. If no snapshot → boot from install ISO + recovery mode |
-| VM boots but no network | *VM Settings → Network Adapter*: confirm correct VMnet/port group. Inside VM: `nmcli con up <conn>` (Linux) or `netsh int ip reset` (Windows) |
+| VM won't boot | ESXi UI → VM → Snapshots → *Revert to last good*. If no snapshot → boot from install ISO + recovery mode |
+| VM boots but no network | ESXi UI → VM → Edit → Network Adapter: confirm correct port group. Inside VM: `nmcli con up <conn>` (Linux) or `netsh int ip reset` (Windows) |
 | pfSense forgot rules | Restore from `Diagnostics → Backup & Restore → Restore configuration` |
 | WinSRV1 AD broken | If you have an OVA backup, restore. Otherwise: `dcpromo /forceremoval` then reinstall — **slow** |
 | LinSRV1 SELinux blocking httpd | `setenforce 0` temporarily, fix context with `restorecon -Rv /var/www/manila`, `setenforce 1` |
 | Burp showing cert errors on Juice Shop | Re-import Burp CA cert (`05_…` Step 5.2). Restart Firefox |
-| Juice Shop won't start | `cd D:\juice-shop\juice-shop_<ver> && rd /s /q node_modules && npm install && npm start` |
-| Kali VM stuck at boot | F12 menu → boot recovery mode → log in single-user → fix `/etc/fstab` if disk error |
+| Juice Shop won't start | On Kali (per `05_…`): `cd ~/juice-shop_<ver> && rm -rf node_modules && npm install && npm start` |
+| Kali VM stuck at boot | ESXi UI → Console → press `e` at GRUB → boot single-user → fix `/etc/fstab` if disk error |
 | ESXi web UI hangs | SSH in (`ssh esxi`) → `/etc/init.d/hostd restart && /etc/init.d/vpxa restart` |
-| Workstation says "VMware Authorization Service not running" | Run as admin: `net start "VMware Authorization Service"`. If still failing → reinstall Workstation |
-| Snapshot tree got bloated, low disk | Delete snapshots top-down (oldest first). Workstation: *VM → Snapshot → Snapshot Manager → Delete All* |
+| Snapshot tree got bloated on ESXi datastore | ESXi UI → VM → Snapshots → Delete oldest first |
 
 ---
 
@@ -334,12 +336,11 @@ After the session:
 
 After this file's setup is done, both PCs should:
 
-- [ ] Pass Task Manager virtualization-enabled check
 - [ ] Have all `D:\...` folders created and AV-excluded
-- [ ] VMware Workstation Pro 17 installed + licensed
+- [ ] VMware OVF Tool installed (for OVA conversion)
 - [ ] Browser bookmarks loaded
 - [ ] OpenSSH client config aliases working (`ssh esxi` connects)
-- [ ] Both PCs can reach `https://192.168.1.10/ui`
+- [ ] Both PCs can reach `https://192.168.1.1/ui` (ESXi web UI)
 - [ ] SMB share between PC1 ↔ PC2 working
 - [ ] Greenshot, LibreOffice, Notepad++ installed
 

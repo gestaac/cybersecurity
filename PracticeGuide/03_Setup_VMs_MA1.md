@@ -19,24 +19,30 @@ For practice we build the same 2 VMs ourselves. The chief hasn't disclosed which
 
 ---
 
-## Part 1 — Network setup
+## Part 1 — Network setup (on the ESXi server)
 
-Both VMs sit on a **single host-only VMnet** with subnet `192.168.2.0/24`. They don't need internet (after the build is done).
+Both VMs sit on the **PG-MA1-CMS** port group on the ESXi server with subnet `192.168.2.0/24`. They don't need internet after the build is done.
 
-### Single-PC mode (VMware Workstation)
-- Use **VMnet15** as a fresh host-only network with subnet `192.168.2.0/24`. Edit → Virtual Network Editor → Add → host-only → Subnet `192.168.2.0/24` → DHCP **disabled**, Connect host adapter ticked (so the Network Adapter dropdown shows it).
+### Create PG-MA1-CMS on ESXi
+1. ESXi UI → **Networking** → **Port groups** → **Add port group**.
+2. Fill in:
+   - **Name:** `PG-MA1-CMS`
+   - **VLAN ID:** `0`
+   - **Virtual switch:** the same vSwitch you set up for PG-Servers (or a separate one if you want full isolation).
+3. Click **Add**.
 
-### 3-PC ESXi mode
-- Add a port group `PG-MA1-CMS` on a vSwitch. Subnet `192.168.2.0/24`.
+> 💡 Both Kali and the CMS target will connect to this same port group. They talk to each other via this virtual cable.
 
 ---
 
 ## Part 2 — Build the CMS target VM (Drupal 7)
 
-### Step 2.1 — Create the VM
-- New VM → Linux → **CentOS Stream 9** or **Ubuntu Server 22.04** (either works; Ubuntu is simpler).
-- 2 GB RAM, 1 vCPU, 20 GB disk thin-provisioned.
-- NIC on VMnet15 (single-PC) or PG-MA1-CMS (ESXi).
+### Step 2.1 — Create the VM (on ESXi)
+- ESXi UI → Virtual Machines → **Create / Register VM** → New VM.
+- Guest OS family: Linux. Guest OS version: **CentOS Stream 9** OR **Ubuntu Linux (64-bit)** (either works; Ubuntu is simpler for beginners).
+- **2 GB RAM, 1 vCPU, 20 GB disk thin-provisioned.**
+- **Network adapter 1:** PG-MA1-CMS.
+- **CD/DVD drive:** point to the OS ISO you uploaded to the datastore (Ubuntu Server 22.04 or CentOS Stream 9).
 - During install: hostname `cms-target`, create user `competitor / P@ssw0rd`, set root password `P@ssw0rd`.
 
 ### Step 2.2 — Set static IP `192.168.2.1`
@@ -168,10 +174,20 @@ Snapshot the VM as `cms-target-vulnerable`. This is the **starting state** for e
 
 ## Part 3 — Build the Kali attacker VM
 
-### Step 3.1 — Import Kali
-- Download Kali 2025.x VMware image from `https://www.kali.org/get-kali/#kali-virtual-machines`.
-- Extract → File → Open the `.vmx` → "I copied it".
-- VM Settings → Network Adapter → **Custom: VMnet15** (single-PC) or **PG-MA1-CMS** (ESXi).
+### Step 3.1 — Import Kali into ESXi
+- Download the **Kali Linux 2025.x VMware image** from `https://www.kali.org/get-kali/#kali-virtual-machines` (need internet on PC1).
+- Extract the 7z / zip — you get a folder with `.vmx` and several `.vmdk` files.
+- **Convert VMware Workstation format → ESXi-compatible OVA** (one extra step since you're going to ESXi):
+  1. On PC1 install **VMware OVF Tool** (free, from VMware): `https://developer.vmware.com/web/tool/4.6.0/ovf`.
+  2. Open Command Prompt → `cd` to the extracted Kali folder.
+  3. Convert:
+     ```cmd
+     "C:\Program Files\VMware\VMware OVF Tool\ovftool.exe" kali-linux-*.vmx kali-linux.ova
+     ```
+- Upload `kali-linux.ova` to your ESXi datastore (Storage → Datastore browser → Upload).
+- ESXi UI → Virtual Machines → **Create / Register VM** → **Deploy a virtual machine from an OVF or OVA file** → select the uploaded OVA.
+- Configure: **Network adapter → PG-MA1-CMS**. Memory **4 GB**. Disk thin.
+- Finish.
 
 ### Step 3.2 — Set static IP `192.168.2.2`
 After Kali boots:

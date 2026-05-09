@@ -1,6 +1,6 @@
 # 02c — Setup the ESXi Server (the 3rd PC / system unit)
 
-End-to-end install of VMware ESXi 8 on the 3rd box. Use this when you have the dedicated ESXi server hardware and are ready to graduate from single-PC practice (`02b_…`) to the full 3-box rig (`02_…`).
+End-to-end install of VMware ESXi 8 on the 3rd box — the dedicated **ESXi server** in your 2-PC + ESXi rig per `02_Setup_Topology.md`.
 
 > Time: ~90 minutes total. Most of it is install + first-boot updates. The actual click-through of the installer is 10 minutes.
 
@@ -35,12 +35,11 @@ If your motherboard has only a Realtek NIC, ESXi will install but **show no netw
 | Option | What | Cost |
 |---|---|---|
 | **Add an Intel I210/I225 PCIe NIC** ✅ recommended | Cheap PCIe card with a supported Intel chip | ~₱700–1,000 |
-| **Build a custom ESXi ISO with the Realtek driver injected** | Use PowerCLI to merge the community Realtek VIB into the stock ISO. **Full walkthrough: `02d_Setup_ESXi_Custom_ISO.md`** | Free (~45 min effort) |
-| **Skip ESXi entirely, use Workstation Pro** | Run all VMs in VMware Workstation on Windows directly (per `02b_…`). Same practice value, no driver fight | Free |
+| **Build a custom ESXi ISO with the Realtek driver injected** | Use William Lam's method to merge the community Realtek VIB into the stock ISO. **Full walkthrough: `02d_Setup_ESXi_Custom_ISO.md`** | Free (~45 min effort) |
 
 **To check before committing:** Google your motherboard model + "ESXi 8 compatibility". Or check the VMware HCL link in A.1.
 
-> 🚨 If you boot the stock ESXi installer and see *"No Network Adapters"* error → that's the Realtek issue. **Go directly to `02d_Setup_ESXi_Custom_ISO.md`** for the custom-ISO build, OR fall back to `02b_…` for Workstation Pro.
+> 🚨 If you boot the stock ESXi installer and see *"No Network Adapters"* error → that's the Realtek issue. **Go directly to `02d_Setup_ESXi_Custom_ISO.md`** for the custom-ISO build.
 
 ### A.5 BIOS / UEFI features required
 You'll enable these in BIOS (next section):
@@ -172,9 +171,8 @@ Your Gigabyte board has these top tabs: `M.I.T. | System | BIOS | Peripherals | 
 
 | Install path | BIOS changes required |
 |---|---|
-| **Bare-metal ESXi** (replaces Windows on the 3rd PC) | All of Steps 1–7 above |
-| **Nested ESXi** (ESXi as a VM inside VMware Workstation on the 3rd PC) | Only Steps 1 + 2 (VT-x + VT-d). Skip Secure Boot, boot mode, USB priority. |
-| **Workstation directly** (no ESXi at all — single-PC mode per `02b_…`) | Only Step 1 (VT-x). |
+| **Bare-metal ESXi** (replaces Windows on the 3rd PC) ← the recommended setup | All of Steps 1–7 above |
+| **Nested ESXi** (ESXi as a VM inside VMware Workstation on the 3rd PC) ← only if hardware refuses bare metal | Only Steps 1 + 2 (VT-x + VT-d). Skip Secure Boot, boot mode, USB priority. |
 
 After applying, **Save & Exit (F10)** and reboot.
 
@@ -184,7 +182,7 @@ At the Gigabyte splash logo on next reboot:
 - Press **F12** repeatedly → boot menu appears → arrow-key to your USB → Enter.
 - (If F12 doesn't work, try **F11**. Some older Gigabyte boards use F12 only in UEFI mode, F11 in Legacy.)
 
-> Skip this step entirely if you're using nested ESXi or single-PC Workstation mode.
+> Skip this step entirely if you're using nested ESXi (running ESXi as a VM inside another hypervisor instead of bare metal).
 
 ---
 

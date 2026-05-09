@@ -2,6 +2,7 @@
 
 This calendar assumes you and your teammate can practice **3 hours per evening** weekdays + **6 hours per day** on weekends. Adjust as needed.
 
+> Setup: **2 actual PCs (PC1 + PC2) + 1 ESXi server** — same as the actual competition rig.
 > Total commitment: ~50 hours over 2 weeks.
 
 ---
@@ -9,16 +10,16 @@ This calendar assumes you and your teammate can practice **3 hours per evening**
 ## Week 1 — Setup + Day 1 mastery
 
 ### Day 1 (Mon) — Tooling install (3 h)
-- [ ] Both teammates: install VMware Workstation Pro 17.
-- [ ] Download all 4 OS ISOs.
-- [ ] Install workstation tools (Chrome, PuTTY, WinSCP, Wireshark, Nmap, OpenVPN Connect).
-- [ ] **Reference:** `01_Setup_Tools.md`
+- [ ] Both teammates: install VMware OVF Tool on PC1 + PC2 (for OVA conversions).
+- [ ] Download all 4 OS ISOs to `D:\ISO\`.
+- [ ] Install workstation tools (Chrome, PuTTY, WinSCP, Wireshark, Nmap, OpenVPN Connect, Burp Community).
+- [ ] **Reference:** `01_Setup_Tools.md`, `08_Setup_Workstations_HostOS.md`
 
 ### Day 2 (Tue) — ESXi + topology (3 h)
-- [ ] Install ESXi 8 on team server (3-PC mode) OR set up VMnets (single-PC mode).
+- [ ] Install ESXi 8 on the 3rd PC (the team server). If "No Network Adapters" → see `02d_Setup_ESXi_Custom_ISO.md`.
 - [ ] Create 5 vSwitches + port groups (PG-Internet, PG-LAN, PG-DMZ, PG-Servers, PG-MA1-CMS).
-- [ ] Confirm ESXi reachable from PC1 and PC2.
-- [ ] **Reference:** `02_Setup_Topology.md` (3-PC) or `02b_…` (single-PC)
+- [ ] Confirm ESXi web UI reachable at `https://192.168.1.1` from both PC1 and PC2.
+- [ ] **Reference:** `02_Setup_Topology.md` + `02c_Setup_ESXi_Server.md`
 
 ### Day 3 (Wed) — Build MA1 environment (CMS pentest target + Kali, 3 h)
 - [ ] CMS target VM — Drupal 7 LAMP install on CentOS or Ubuntu (60 min)
@@ -75,10 +76,10 @@ This calendar assumes you and your teammate can practice **3 hours per evening**
 - [ ] **Reference:** `20_…` through `30_…`
 
 ### Day 10 (Wed) — CTF tooling install + Juice Shop ★1–★2 (3 h)
-- [ ] Node.js 20 LTS + Juice Shop ZIP running on `http://localhost:3000`.
-- [ ] Burp + Firefox + CA cert imported (`05_…` Step 5).
+- [ ] Node.js 20 LTS installed on Kali (the ESXi VM) → Juice Shop running on `http://192.168.2.2:3000`.
+- [ ] Burp + Firefox on Kali + CA cert imported (`05_…` Step 5).
 - [ ] Solve every Juice Shop ★1 + ★2 challenge.
-- [ ] In parallel: download all 8 VulnHub VMs (`06_…` Part F) → `D:\VulnHub\`.
+- [ ] In parallel: download all 8 VulnHub VMs (`06_…` Part F) → `D:\OVA\` on PC1, then upload to ESXi datastore.
 - [ ] **Reference:** `05_…`, `06_…`, `50_…`
 
 ### Day 11 (Thu) — VulnHub Boot-to-Root drill #1 (3 h)
@@ -118,14 +119,17 @@ Each session:
 
 ## What to bring to the competition
 
-- USB stick (per Infrastructure-List): 4 patch cords, your laptop with VMware Workstation, your ESXi server, unmanaged switch, power extension.
+- **3 boxes:** PC1, PC2, ESXi server (per Infrastructure-List).
+- **Patch cords:** at least 4.
+- **Unmanaged switch + power extension** (per Infrastructure-List).
 - Backup USB(s) — minimum **128 GB total** (or use a **1 TB external SSD** — recommended given that PCs only have 500 GB internal each) — with:
-  - All Day-1 OS ISOs (pfSense, CentOS, Win Server 2022, Win 10).
-  - Kali Linux VM image.
-  - All 8 recommended VulnHub VMs (`06_…` Part F) — about 50 GB.
-  - Juice Shop offline ZIP + Pwning Juice Shop PDF/EPUB.
+  - All Day-1 OS ISOs (pfSense, CentOS, Win Server 2022, Win 10) — for re-uploading to ESXi if anything's lost.
+  - Kali Linux OVA (already converted from `.vmx`).
+  - All 8 recommended VulnHub OVAs (`06_…` Part F) — about 50 GB.
+  - Juice Shop offline release tarball + Pwning Juice Shop PDF/EPUB.
   - HackTricks PDF, GTFOBins offline mirror, LinPEAS/WinPEAS, LinEnum.sh.
   - SecLists, rockyou.txt extracted.
+  - VMware OVF Tool installer (for last-minute conversions).
   - This entire `PracticeGuide/` folder.
 - Notepad (paper) for sketching network diagrams during MA2.
 
