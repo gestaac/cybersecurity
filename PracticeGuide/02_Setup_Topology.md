@@ -371,7 +371,7 @@ Pre-built and pre-configured by the organisers — already on the ESXi datastore
 > Workstation login: `competitor1a / Boracay@14!`
 
 #### G.3.2 Day 2 — MA2 set (build/harden manila.com)
-**Per MA2 PDF Table 1** — 9 VMs across 4 VLANs:
+**Per MA2 PDF Table 1 + Security Onion** — 10 VMs across 4 VLANs (+ PG-MIRROR for SO sniffing):
 
 | VM | Role | Pre-installed inside |
 |---|---|---|
@@ -383,6 +383,7 @@ Pre-built and pre-configured by the organisers — already on the ESXi datastore
 | **LINSRV1** | Apache web server in DMZ, you harden it | CentOS Stream 9 + httpd + base packages, deliberately un-hardened |
 | **Client1, Client2** | LAN clients, DHCP | Win 10 + Chrome, PuTTY, Wireshark |
 | **Client3** | External client, DHCP from ISP | Win 10 + Chrome, PuTTY, Wireshark, **Nmap**, OpenVPN Connect |
+| **SecOnion** | Day 2 PM IR/Forensics platform — Security Onion 2.4 on PG-Servers + sniffing on PG-MIRROR | Built per `07_Setup_SecurityOnion.md` |
 
 > Workstation login: `competitor1b / Tagaytay_62&L`. ESXi login: `wsauser / Andres@9V4` at `192.168.1.1`.
 

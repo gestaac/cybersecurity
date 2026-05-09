@@ -38,12 +38,24 @@ Both VMs sit on the **PG-MA1-CMS** port group on the ESXi server with subnet `19
 ## Part 2 — Build the CMS target VM (Drupal 7)
 
 ### Step 2.1 — Create the VM (on ESXi)
-- ESXi UI → Virtual Machines → **Create / Register VM** → New VM.
-- Guest OS family: Linux. Guest OS version: **CentOS Stream 9** OR **Ubuntu Linux (64-bit)** (either works; Ubuntu is simpler for beginners).
-- **2 GB RAM, 1 vCPU, 20 GB disk thin-provisioned.**
-- **Network adapter 1:** PG-MA1-CMS.
-- **CD/DVD drive:** point to the OS ISO you uploaded to the datastore (Ubuntu Server 22.04 or CentOS Stream 9).
-- During install: hostname `cms-target`, create user `competitor / P@ssw0rd`, set root password `P@ssw0rd`.
+- ESXi UI → Virtual Machines → **Create / Register VM** → **Create a new virtual machine** → Next.
+- **Name:** `CMS-Target` (this is just the ESXi label — the OS hostname is set later)
+- **Compatibility:** ESXi 8.0 virtual machine
+- **Guest OS family:** Linux
+- **Guest OS version:** **Ubuntu Linux (64-bit)** OR **CentOS 9 (64-bit)** (Ubuntu is simpler for beginners; pick one and stick with it)
+- Click Next → select your datastore → Next.
+- **Customize hardware:**
+  - **CPU:** 1 vCPU
+  - **Memory:** `2048` MB (2 GB)
+  - **Hard disk 1:** `20` GB, **Thin Provisioned** (under Disk Provisioning)
+  - **Network adapter 1:** `PG-MA1-CMS` ← important
+  - **CD/DVD Drive 1:** **Datastore ISO file** → browse to the Ubuntu Server 22.04 OR CentOS Stream 9 ISO you uploaded to the datastore → tick **Connect at power on**
+- Review → **Finish**.
+- Power on the VM → click **Console** to open the install screen.
+- During the OS install:
+  - **Hostname:** `cms-target`
+  - **User:** `competitor` / **Password:** `P@ssw0rd`
+  - **Root password:** `P@ssw0rd`
 
 ### Step 2.2 — Set static IP `192.168.2.1`
 After OS install, log in as root:

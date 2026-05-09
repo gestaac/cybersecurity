@@ -87,7 +87,7 @@ With snapshots in place, every dry-run starts from the same clean state. You pra
 3. **`02c_Setup_ESXi_Server.md`** — install ESXi on the 3rd PC. If "No Network Adapters" → see `02d_Setup_ESXi_Custom_ISO.md`.
 4. **`08_Setup_Workstations_HostOS.md`** — Windows host prep on PC1 + PC2 (folder layout, OVF Tool, browser bookmarks, SSH aliases).
 5. **`03_Setup_VMs_MA1.md`** — CMS pentest target + Kali (2 VMs on 192.168.2.0/24).
-6. **`04_Setup_VMs_MA2.md`** — manila.com environment (9 VMs across 4 VLANs).
+6. **`04_Setup_VMs_MA2.md`** — manila.com environment (10 VMs across 4 VLANs, including Security Onion for Day 2 PM).
 7. **`05_Setup_JuiceShop.md`** — Juice Shop on host or Kali.
 8. **`06_Setup_VulnHub.md`** — download + import VulnHub VMs.
 

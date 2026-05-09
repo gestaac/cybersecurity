@@ -39,34 +39,24 @@ The **spreadsheet** has a 4-day skeleton:
 | Day in spreadsheet | Confirmed reality at competition |
 |---|---|
 | Day 1 = Crit A (MA1+MA2) | **Day 1 = MA1 only (CMS pentest)** — `testpacakge_pdf/WSA2025_TP54_MA1_*.pdf` |
-| Day 2 = Crit B (Lyon CTF flag names) | **Day 2 = MA2 (Security Hardening)** — `testpacakge_pdf/WSA2025_TP54_MA2_*.pdf`. ⚠️ Possibly + a Security Onion / SOC module (chief mentioned but not confirmed — see Open Questions below) |
-| Day 3 = Crit C (Lyon CTF flags) | **Day 3 = CTF (combined)** — random-pick from VulnHub + Juice Shop |
-| Day 4 = Crit D (Lyon CTF flags) | ❌ **No Day 4. Crit D marks are now part of Day 3** (chief explicitly confirmed: "no task from Day 4, it will be Day 3 already") |
+| Day 2 = Crit B "Cyber Security Incident Response, Digital Forensics, Application Security" | **Day 2 morning = MA2 hardening (Crit A2–A8)** + **Day 2 afternoon = Crit B IR/Forensics/AppSec** using Security Onion. Marlon confirmed Security Onion is a Day-2 setup that needs internet alongside OpenVPN. |
+| Day 3 = Crit C "Red CTF" | **Day 3 morning = Red CTF** — VulnHub boot-to-root + Juice Shop exploitation |
+| Day 4 = Crit D "Blue CTF" | ❌ **No Day 4. Crit D shifts into Day 3 afternoon as Blue CTF** (chief explicitly confirmed: "no task from Day 4, it will be Day 3 already") |
 
-**The 25 marks of Crit D ("Blueday Flags" / CS Flags) are still earnable** — they just shift into Day 3's CTF work alongside Crit C. So Day 3 effectively carries **~50 marks** (Crit C 25 + Crit D 25).
+**Spreadsheet row 19 explicitly names Crit B as "Cyber Security Incident Response, Digital Forensics, Application Security" — NOT MA2 hardening.** MA2 belongs to Crit A2–A8. See B section below for the per-flag table.
 
 ### Confirmed mark distribution per day (3-day model)
 
 | Day | Source criteria | Marks |
 |---|---|---|
-| Day 1 (MA1 pentest) | Crit A1 | ~6 |
-| Day 2 (MA2 hardening) | Crit A2–A8 + Crit B (will be redistributed by chief) | ~19 + 25 = ~44 |
-| Day 3 (CTF — Red + Blue combined) | Crit C + Crit D | ~25 + 25 = ~50 |
-| **Total** | | **~100** |
+| Day 1 (MA1 CMS pentest) | Crit A1 | ~6 |
+| Day 2 morning (MA2 hardening) | Crit A2–A8 | ~19 |
+| Day 2 afternoon (IR + Forensics + AppSec, Security Onion) | Crit B | 25 |
+| Day 3 morning (Red CTF) | Crit C | 25 |
+| Day 3 afternoon (Blue CTF) | Crit D | 25 |
+| **Total** | | **100** |
 
-K-values still total 100 overall. The chief will likely revise the marking scheme row names before competition to match the actual ASEAN deliverables.
-
-### Open Questions (still pending chief's clarification)
-
-1. **Day 2 — MA2 only, or MA2 + Security Onion?**
-   - Marlon's earlier message said *"may mga setup doon na need internet yung sa OpenVPN and Security Onion"*
-   - MA2 PDF only mentions OpenVPN + Snort, not Security Onion
-   - Crit B title (*"Cyber Security Incident Response, Digital Forensics, Application Security"*) fits a SOC module
-   - **Pending:** ask Marlon directly — *"Sir, sa Day 2, kasama na po ba sa MA2 PDF lahat, or may separate Security Onion / SOC setup?"*
-
-2. **Crit B redistribution** — the 25 marks of Crit B (HO/CM Flag rows) need to be reassigned to actual deliverables. Either:
-   - All to MA2 deliverables (if no Security Onion)
-   - Split between MA2 + Security Onion (if both required on Day 2)
+K-values total 100 overall. The chief may revise row names before competition; the day-of-marking column (1/2/3/4) and K-totals stay valid.
 
 ### Why the discrepancy exists
 
@@ -82,12 +72,13 @@ So the **DAY numbers and TITLES are reliable**; the **row names are not**.
 
 | Day | What the guide covers | File(s) |
 |---|---|---|
-| 1 | MA1 + MA2 walkthroughs (matches spreadsheet exactly) | `10_…`, `20_…` to `30_…` |
-| 2 | MA2 (full Security Hardening per PDF) | `20_…` through `30_…` |
-| 3 | CTF: Juice Shop ★1–★4 + first VulnHub VM (boot-to-root) | `50_…`, `51_…` |
-| 4 | CTF: harder VulnHub + Juice Shop ★5–★6 | `52_…` |
+| 1 | MA1 CMS pentest walkthrough | `10_…` |
+| 2 AM | MA2 hardening — pfSense + LinSRV1 + AD/GPOs + PKI + verification | `20_…` through `30_…` |
+| 2 PM | IR + Forensics + AppSec — Security Onion install + Day-2 Crit B playbooks | `07_…`, `40_…`, `41_…`, `42_…` |
+| 3 AM | Red CTF — VulnHub boot-to-root + Juice Shop ★1–★6 | `50_…`, `51_…`, `52_…` |
+| 3 PM | Blue CTF — PCAP / memory / disk / log forensics | `53_…` |
 
-When the chief releases the official **Day 2 deliverables doc** and the **ASEAN flag → target mapping** for Days 3–4, we replace the placeholder rows in this file with real aspect-by-aspect K-values.
+When the chief releases the official ASEAN flag→target mapping for Days 2–3, we replace the placeholder per-flag rows in this file with real per-flag K-values.
 
 ---
 

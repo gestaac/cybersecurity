@@ -451,7 +451,7 @@ For each:
 
 ## Final integration check before practice
 
-- [ ] All 9 VMs power on without errors
+- [ ] All 10 VMs power on without errors (9 hardening VMs + Security Onion for Day 2 PM)
 - [ ] ISP responds to DNS lookups from any 10.0.0.x address: `nslookup www.starcity.com.ph 10.0.0.1`
 - [ ] WINSRV1 promoted to manila.com, AD users + groups created
 - [ ] WINSRV3 has CertSvc service, certs issued from Manila-Root-CA chain
