@@ -232,7 +232,7 @@ If you see a web page or services responding — you're ready. **Snapshot the VM
 
 For competition day, copy these onto your USB:
 - [ ] All VMs from Part F **converted to .ova format** (~50 GB total — use a 64 GB+ USB)
-- [ ] Kali Linux .ova (10 GB) — same as you imported on ESXi
+- [ ] Kali Linux Installer ISO (~4 GB) — backup if you ever need to rebuild Kali
 - [ ] VMware OVF Tool installer (in case you need to re-convert anything)
 - [ ] HackTricks PDF
 - [ ] PEASS-ng binaries (linpeas.sh, winPEAS.exe)

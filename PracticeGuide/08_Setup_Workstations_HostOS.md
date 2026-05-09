@@ -102,7 +102,7 @@ D:\
 │   ├── Win_Server_2022.iso
 │   ├── Win10_Enterprise.iso
 │   └── securityonion-2.4.iso
-├── OVA\                    # VulnHub + Kali OVA files (staged for ESXi upload)
+├── OVA\                    # VulnHub OVA files (staged for ESXi upload). Kali is now installed from ISO.
 ├── PracticeGuide\          # copy of this guide
 ├── Tools\                  # local tool installers (run on PC1/PC2)
 │   ├── Burp_Community.exe
@@ -130,7 +130,7 @@ Both PCs use **the same paths** so any guide step works on either teammate's box
 
 ## F. VMware OVF Tool (for converting OVAs)
 
-In our setup VMware Workstation Pro is **NOT** the primary VM host — that's the ESXi server. But you'll occasionally need to **convert `.vmx` files to `.ova`** before uploading to ESXi (e.g., the Kali Linux pre-built image, some VulnHub VMs).
+In our setup VMware Workstation Pro is **NOT** the primary VM host — that's the ESXi server. But you'll occasionally need to **convert `.vmx` files to `.ova`** before uploading to ESXi (e.g., some VulnHub VMs that ship in VMware Workstation format). **Kali Linux is now installed from ISO** (per `03_Setup_VMs_MA1.md` Part 3), so no conversion needed for Kali.
 
 Install OVF Tool on **both PC1 and PC2**:
 1. Download (free): `https://developer.vmware.com/web/tool/4.6.0/ovf`.

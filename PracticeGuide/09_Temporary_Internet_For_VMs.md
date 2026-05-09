@@ -260,7 +260,7 @@ This is your **clean restore point** before competition-style practice begins.
 | VM | When you need this | What you install during temp internet |
 |---|---|---|
 | **CMS-Target** | Once during initial build | LAMP stack (Apache, MariaDB, PHP) + Drupal 7 tarball |
-| **Kali** | Already has internet via OVA-deployed default. Skip if not needed. | Optional: `apt update`, sqlmap updates, etc. |
+| **Kali** | During initial ISO install (recommended) + occasional `apt update` afterwards | Mirror config, security updates, sqlmap/wpscan updates |
 | **ISP** (MA2) | Once during initial build | dnsmasq, httpd, mod_ssl |
 | **LinSRV1** (MA2) | Once during initial build | httpd, realmd, sssd, krb5, libpwquality |
 | **WINSRV1/3/4** (MA2) | Optional during initial install (for Windows Updates) | Windows Updates, RSAT tools |

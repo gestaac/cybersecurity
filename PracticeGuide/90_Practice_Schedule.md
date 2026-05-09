@@ -124,7 +124,7 @@ Each session:
 - **Unmanaged switch + power extension** (per Infrastructure-List).
 - Backup USB(s) — minimum **128 GB total** (or use a **1 TB external SSD** — recommended given that PCs only have 500 GB internal each) — with:
   - All Day-1 OS ISOs (pfSense, CentOS, Win Server 2022, Win 10) — for re-uploading to ESXi if anything's lost.
-  - Kali Linux OVA (already converted from `.vmx`).
+  - Kali Linux Installer ISO (`kali-linux-2025.x-installer-amd64.iso`, ~4 GB).
   - All 8 recommended VulnHub OVAs (`06_…` Part F) — about 50 GB.
   - Juice Shop offline release tarball + Pwning Juice Shop PDF/EPUB.
   - HackTricks PDF, GTFOBins offline mirror, LinPEAS/WinPEAS, LinEnum.sh.

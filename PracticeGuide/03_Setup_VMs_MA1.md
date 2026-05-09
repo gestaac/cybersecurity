@@ -423,31 +423,301 @@ Snapshot the VM as `cms-target-vulnerable`. This is the **starting state** for e
 
 ---
 
-## Part 3 — Build the Kali attacker VM
+## Part 3 — Build the Kali attacker VM (from ISO)
 
-### Step 3.1 — Import Kali into ESXi
-- Download the **Kali Linux 2025.x VMware image** from `https://www.kali.org/get-kali/#kali-virtual-machines` (need internet on PC1).
-- Extract the 7z / zip — you get a folder with `.vmx` and several `.vmdk` files.
-- **Convert VMware Workstation format → ESXi-compatible OVA** (one extra step since you're going to ESXi):
-  1. On PC1 install **VMware OVF Tool** (free, from VMware): `https://developer.vmware.com/web/tool/4.6.0/ovf`.
-  2. Open Command Prompt → `cd` to the extracted Kali folder.
-  3. Convert:
-     ```cmd
-     "C:\Program Files\VMware\VMware OVF Tool\ovftool.exe" kali-linux-*.vmx kali-linux.ova
-     ```
-- Upload `kali-linux.ova` to your ESXi datastore (Storage → Datastore browser → Upload).
-- ESXi UI → Virtual Machines → **Create / Register VM** → **Deploy a virtual machine from an OVF or OVA file** → select the uploaded OVA.
-- Configure: **Network adapter → PG-MA1-CMS**. Memory **4 GB**. Disk thin.
-- Finish.
+> 💡 **Why ISO instead of OVA?** Same install pattern as the CMS-Target (you already know it — boot ISO → walk through installer). No OVF Tool, no `.vmx` conversion, no extra steps on PC1. Trade-off: Kali ISO install takes ~30 min vs OVA deploy at ~5 min — but it's more beginner-friendly and predictable.
+
+> 🌐 **Internet during Kali install — strongly recommended.**
+> The Kali Installer ISO (~4 GB) bundles all default tools, so install **works offline**. But Kali also tries to:
+> - Configure a package manager mirror (faster with internet).
+> - Download security updates during install.
+> - Pull the latest tool definitions.
+>
+> **Recommendation:** before powering on the Kali VM for first install, switch its NIC to **`PG-TempInternet`** (per `09_Temporary_Internet_For_VMs.md` Stage A). After install completes + you've set the static IP in Step 3.2, switch the NIC back to `PG-MA1-CMS`.
+>
+> Doing it offline is ~30% slower on the mirror config step, otherwise fine.
+
+### Step 3.0 — Download the Kali ISO (do this on PC1)
+
+#### Download
+- **URL:** `https://www.kali.org/get-kali/#kali-installer-images`
+- **Click:** the **Installer** tile (NOT "Live Boot" or "Net Installer" or "Virtual Machines")
+- **File:** `kali-linux-2025.x-installer-amd64.iso` (~4 GB)
+- **Save to:** PC1 → `D:\ISO\` folder
+
+> 💡 **Why "Installer" not "Net Installer"?** The Net Installer is small (~500 MB) but downloads all packages during install (needs fast internet). The full Installer (~4 GB) bundles everything and works reliably even if internet is slow.
+
+#### Upload to ESXi datastore
+1. ESXi UI → **Storage** → click your datastore → **Datastore browser**.
+2. Click into the `ISO/` folder you created earlier.
+3. Click **Upload** → select `kali-linux-2025.x-installer-amd64.iso` from PC1.
+4. Wait ~10 min for the upload.
+
+### Step 3.1 — Create the VM on ESXi
+
+ESXi UI → Virtual Machines → **Create / Register VM** → **Create a new virtual machine** → Next.
+
+#### Screen 2 — Name and Guest OS
+| Field | Value |
+|---|---|
+| **Name** | `Kali` |
+| **Compatibility** | ESXi 8.0 virtual machine |
+| **Guest OS family** | Linux |
+| **Guest OS version** | Debian GNU/Linux 12 (64-bit) ← Kali is based on Debian 12 |
+
+Click Next.
+
+#### Screen 3 — Storage
+Pick your default datastore → Next.
+
+#### Screen 4 — Customize hardware
+| Field | Value |
+|---|---|
+| **CPU** | 2 |
+| **Memory** | `4096` MB (4 GB) |
+| **Hard disk 1** | `80` GB, **Thin Provisioned** |
+| **Network Adapter 1** | `PG-MA1-CMS` |
+| **CD/DVD Drive 1** | Datastore ISO file → `kali-linux-2025.x-installer-amd64.iso` → ✅ Connect at power on |
+
+Click Next.
+
+#### Screen 5 — Ready to complete
+Review → **Finish**.
+
+Power on the VM → click **Console**.
+
+### Step 3.1.1 — Walk through the Kali graphical installer (~30 min)
+
+> Beginner notes: the Kali installer has both **Graphical Install** (mouse + keyboard) and **Install** (text-mode, faster). Pick **Graphical Install** — easier for beginners.
+
+**Screen 1 — Boot menu**
+
+You see a Kali boot menu with several options:
+```
+Kali GNU/Linux Installer Boot Menu
+─────────────────────────────────
+  Live system (amd64)
+  Live system (amd64 forensic mode)
+  Install
+  ► Graphical install
+  Advanced options
+  Help
+  Boot from first hard disk
+```
+
+- Highlight **`Graphical install`** with arrow keys.
+- Press **Enter**.
+
+**Screen 2 — Select a language**
+
+- Pick **English** → **Continue**.
+
+**Screen 3 — Select your location**
+
+- Click **other** → **Asia** → **Philippines** → **Continue**.
+
+**Screen 4 — Configure locales**
+
+- Pick **United States — en_US.UTF-8** (default). Continue.
+
+**Screen 5 — Configure the keyboard**
+
+- Pick **American English** (default). Continue.
+
+**Screen 6 — Loading installer components** (auto, ~30 sec wait)
+
+The installer pulls additional components from the ISO. No interaction.
+
+**Screen 7 — Configure the network — Hostname**
+
+- **Hostname:** `kali`
+- Click **Continue**.
+
+**Screen 8 — Domain name**
+
+- Leave blank.
+- Click **Continue**.
+
+**Screen 9 — Set up users and passwords — Full name**
+
+- **Full name for the new user:** `Kali User`
+- Click **Continue**.
+
+**Screen 10 — Username for your account**
+
+- **Username:** `kali`
+- Click **Continue**.
+
+**Screen 11 — Password for the new user**
+
+- **Choose a password:** `kali`
+- **Re-enter password to verify:** `kali`
+- Click **Continue**.
+
+> 💡 The MA1 PDF Table 1 specifies Kali credentials as `kali / kali`. Use exactly that.
+
+**Screen 12 — Configure the clock**
+
+- **Timezone:** Asia/Manila (or whichever city is closest)
+- Click **Continue**.
+
+**Screen 13 — Partition disks (method)**
+
+- Pick **Guided - use entire disk** (default).
+- Click **Continue**.
+
+**Screen 14 — Select disk to partition**
+
+- You see one disk: `SCSI3 (0,0,0) (sda) - 80 GB VMware Virtual disk`.
+- Highlight it → **Continue**.
+
+**Screen 15 — Partitioning scheme**
+
+- Pick **All files in one partition (recommended for new users)**.
+- Click **Continue**.
+
+**Screen 16 — Review partitioning**
+
+- You see the proposed partition layout (1× ext4 root, 1× swap).
+- Highlight **Finish partitioning and write changes to disk** → **Continue**.
+
+**Screen 17 — Confirm write changes**
+
+- "Write the changes to disks?" → ✅ **Yes** → **Continue**.
+
+**Screen 18 — Installing the base system** (5 min wait)
+
+Progress bar fills. No interaction.
+
+**Screen 19 — Software selection**
+
+You see checkboxes for desktop + tools:
+```
+Choose software to install:
+  ☑ Xfce (Kali's default desktop environment)
+  ☐ GNOME
+  ☐ KDE Plasma
+  ─────────
+  ☑ Collection of tools — top10 — the 10 most popular tools
+  ☐ Collection of tools — default — recommended tools (default)
+  ☐ Collection of tools — large — default selection PLUS additional tools
+  ☐ Collection of tools — everything
+  ─────────
+  ☐ Standard system utilities
+```
+
+For our use, recommended:
+- ✅ **Xfce** — keep default. Lightweight, fast.
+- ✅ **Collection of tools — default** — has nmap, sqlmap, hydra, john, hashcat, Burp, Wireshark, Metasploit, gobuster, ffuf, etc. (**Untick "top10" if you tick "default"** — they overlap.)
+- ✅ **Standard system utilities** — keep default.
+
+> 💡 **Don't pick `everything`** — that's ~30 GB of tools, takes 1+ hour to install. **default** has everything we need (~15 GB).
+
+Click **Continue**.
+
+**Screen 20 — Installing software** (15–20 min wait)
+
+Big wait. Get coffee.
+
+**Screen 21 — Install the GRUB boot loader**
+
+- "Install the GRUB boot loader to your primary drive?" → ✅ **Yes** → **Continue**.
+
+**Screen 22 — Device for boot loader installation**
+
+- Highlight `/dev/sda` → **Continue**.
+
+**Screen 23 — Finish the installation**
+
+- "Installation complete." → **Continue**.
+
+> ⚠️ **EJECT THE ISO before reboot completes:**
+> 1. Don't close the console.
+> 2. Switch to ESXi UI → Kali VM → **Edit**.
+> 3. **CD/DVD Drive 1** → uncheck "Connect at power on" → dropdown to **`Host device`**.
+> 4. Click **Save**.
+> 5. Switch back to console → wait for reboot.
+
+**Screen 24 — GRUB after reboot**
+
+- 5-second countdown → boots Kali GNU/Linux.
+
+**Screen 25 — Login screen (graphical)**
+
+After boot you see a graphical login screen with a Kali dragon background.
+
+- Username: `kali`
+- Password: `kali`
+- Click **Log In**.
+
+You land in the Xfce desktop. Top bar has a Kali menu, terminal icon, file manager, browser.
+
+✅ **Kali is installed.** Continue with Step 3.2.
+
+#### Common Kali installer issues
+
+| Problem | Fix |
+|---|---|
+| Boot menu doesn't appear / black screen | Wait 60 sec — early boot is silent. If still black, reset VM. |
+| Mouse pointer stuck or jumpy | Click inside the VM console window first. Press Ctrl+Alt to release. |
+| Software install hangs at >30 min on one package | Some packages have post-install scripts that take a while. Wait 5 more min before resetting. |
+| GRUB install fails | Pick `/dev/sda` explicitly (not "Use entire disk" radio button if it appeared). |
+| After reboot, boots installer again | ISO not ejected. Edit VM → CD/DVD → uncheck Connect at power on → reset VM. |
+| First desktop login takes 1+ minute | Xfce first-run is slow. Subsequent logins are fast (~10 sec). |
 
 ### Step 3.2 — Set static IP `192.168.2.2`
-After Kali boots:
+
+Kali uses **NetworkManager** by default with a GUI applet — easiest for beginners.
+
+#### Step 3.2.1 — Find your interface name
+
+Open a terminal (top bar → Terminal Emulator icon, or right-click desktop → Open Terminal):
+
 ```bash
-sudo nmcli con mod "Wired connection 1" ipv4.addresses 192.168.2.2/24 ipv4.method manual
+ip link show
+```
+
+Look for the line that's NOT `lo` — your interface might be `eth0`, `ens34`, `ens160`, etc. **Note your name** (the example below uses `eth0`).
+
+#### Step 3.2.2 — Set the static IP via NetworkManager GUI
+
+1. Top-right of the screen → click the **network icon** (looks like 2 stacked arrows or a wired plug).
+2. Click **Edit Connections...**
+3. You see a list of saved connections. Highlight **Wired connection 1** (or the one matching your interface name).
+4. Click the **gear icon** (Edit) at the bottom.
+5. In the dialog, click the **IPv4 Settings** tab.
+6. Method drop-down → change from `Automatic (DHCP)` to **`Manual`**.
+7. Click **Add** next to the (empty) addresses table.
+8. Fill in:
+   - **Address:** `192.168.2.2`
+   - **Netmask:** `24` (or `255.255.255.0`)
+   - **Gateway:** `192.168.2.254` (leave empty if you don't need internet through this NIC)
+9. **DNS servers:** `8.8.8.8`
+10. Click **Save**.
+11. Close the Connections window.
+12. Top-right network icon → click your connection → click **Disconnect**, then click it again to **Connect**. (This re-applies the new IP.)
+
+#### Step 3.2.3 — Set static IP via terminal (alternative if GUI fails)
+
+```bash
+sudo nmcli con mod "Wired connection 1" \
+    ipv4.addresses 192.168.2.2/24 \
+    ipv4.gateway 192.168.2.254 \
+    ipv4.dns 8.8.8.8 \
+    ipv4.method manual
+
 sudo nmcli con up "Wired connection 1"
 ```
 
-Default credentials: `kali / kali` (matches the MA1 PDF Table 1).
+> 💡 If your connection name isn't "Wired connection 1", run `nmcli con show` to find the actual name and substitute it.
+
+#### Step 3.2.4 — Verify
+
+```bash
+ip a
+```
+
+Look for the interface line showing `inet 192.168.2.2/24`. ✅
 
 ### Step 3.3 — Confirm tooling is present
 ```bash
