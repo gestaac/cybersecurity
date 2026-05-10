@@ -40,7 +40,9 @@ For practice, build it to the **same starting point**. Then practice the actual 
 | **Name** | `ISP` |
 | **Compatibility** | ESXi 8.0 virtual machine |
 | **Guest OS family** | Linux |
-| **Guest OS version** | CentOS 9 (64-bit) |
+| **Guest OS version** | **`Red Hat Enterprise Linux 9 (64-bit)`** — see fallbacks below if not available |
+
+> ⚠️ **ESXi 8.0 U2 may not list "CentOS Stream 9" in the dropdown.** Pick in this order: <br>1. **`Red Hat Enterprise Linux 9 (64-bit)`** — best match (upstream of CentOS Stream 9) <br>2. `CentOS 8 (64-bit)` — same kernel family, works fine <br>3. `Red Hat Enterprise Linux 8 (64-bit)` — also compatible <br>4. `Other Linux 5.x or later kernel (64-bit)` — generic fallback (always works) <br><br>The Guest OS picker only hints at hardware defaults; the CentOS Stream 9 ISO installs the same way regardless.
 | **CPU** | 1 |
 | **Memory** | `1024` MB (1 GB) |
 | **Hard disk 1** | `10` GB, **Thin Provisioned** |
@@ -586,6 +588,18 @@ Fill in:
 | **Guest OS version** | (from the Part's specs table) |
 
 Click **Next**.
+
+> ⚠️ **Guest OS dropdown fallbacks (read once, applies to ALL Linux VMs in this guide):**
+>
+> - **For CentOS Stream 9 VMs (ISP, LinSRV1):** ESXi 8.0 U2 may not list "CentOS Stream 9". Pick in this order:
+>   1. `Red Hat Enterprise Linux 9 (64-bit)` ← best match
+>   2. `CentOS 8 (64-bit)` ← compatible
+>   3. `Other Linux 5.x or later kernel (64-bit)` ← always works
+> - **For pfSense:** pick `FreeBSD 13 or later versions (64-bit)`. If not available → `FreeBSD 12 (64-bit)` → `Other (64-bit)`.
+> - **For Windows Server 2022 (WINSRV1/3/4):** pick `Microsoft Windows Server 2022`. If not listed → `Microsoft Windows Server 2019` works fine.
+> - **For Windows 10 Eval (Client1/2/3):** pick `Microsoft Windows 10 (64-bit)` — should always be present.
+>
+> The Guest OS picker only hints at hardware defaults (recommended NIC type, SCSI controller, RAM, BIOS mode). The OS itself installs identically regardless of which option you pick. **A close-match pick = perfectly fine.**
 
 ## Screen 3 — Select storage
 
