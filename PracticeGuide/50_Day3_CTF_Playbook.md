@@ -2,7 +2,7 @@
 
 > **Day plan reminder:** confirmed 3-day competition. Day 1 = MA1 (CMS pentest), Day 2 = MA2 (Security Hardening), **Day 3 = CTF (this file + `51_…` + `52_…`)**.
 
-**Time budget:** ~3 hours warm-up on Day 3 morning, then VulnHub afternoon. Adjust if the actual schedule varies.
+**Time budget:** ~3 hours on Day 3 morning (Red Teaming) + Day 3 afternoon (Blue Teaming "Analysis and Exploitation") — chief Marlon confirmed 2026-05-10 that BOTH halves of Day 3 are Juice Shop. 45 flags total, randomly drawn from 111 challenges.
 **Target:** `http://localhost:3000` (your local instance from `05_Setup_JuiceShop.md`).
 
 > 🚫 No internet, no AI tools. The Pwning OWASP Juice Shop ebook is the only outside reference allowed (because it ships with the project itself, not because rules permit external write-ups — verify with the chief).
@@ -172,8 +172,8 @@ At the actual competition the organizers handle the integration; you only need t
 | 0:00–0:15 | Both teammates open Juice Shop side-by-side. Find score-board. |
 | 0:15–1:30 | Solve every ★1 (≈ 8 challenges). |
 | 1:30–3:00 | Solve every ★2 (≈ 12 challenges). |
-| 3:00–4:30 | Start ★3 — see `51_Day3_VulnHub_BootToRoot.md`. |
-| 4:30–5:30 | Continue, lean on ebook hints. |
+| 3:00–4:30 | Push into ★3 + ★4 in Juice Shop (Forged Coupon, Database Schema UNION SQLi, Reset Bender's, JWT forging). |
+| 4:30–5:30 | Day 3 PM Blue Teaming — Juice Shop categories Sensitive Data Exposure / Cryptographic Issues / Security Misconfiguration / Vulnerable Components. |
 | 5:30–6:00 | Documentation + report PDF. |
 
 ---
@@ -187,4 +187,6 @@ The marking-scheme rows for Day 3 morning (HO-/CM- prefixes) are Lyon leftovers.
 
 Track this row by row during the actual CTF.
 
-Next file: **`51_Day3_VulnHub_BootToRoot.md`** — boot-to-root playbook + medium walkthroughs.
+Next file: **`00_Tomorrow_Final_Schedule.md`** — exact hour-by-hour plan for the day before competition.
+
+> Note: `51_Day3_VulnHub_BootToRoot.md`, `52_Day3_CTF_Advanced.md`, and `53_Day3_BlueCTF.md` are obsolete (chief restructure 2026-05-10). Day 3 is OWASP Juice Shop only — both AM Red and PM Blue.

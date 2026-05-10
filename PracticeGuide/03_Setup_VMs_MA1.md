@@ -330,24 +330,115 @@ This way the VM's "competition starting state" is sealed on the isolated practic
 
 ### Step 2.3 — Install LAMP stack + Drupal 7
 
+> ⚠️ **CRITICAL:** Drupal 7.57 (the version with Drupalgeddon 2) was released in 2018 and **does NOT work on PHP 8.x**. Ubuntu 22.04 ships PHP 8.1 by default — installing it will give you a 500 error in Step 2.4 when you try the Drupal installer. We avoid this by installing **PHP 7.4** explicitly via the Ondrej PPA. The 5 sub-steps below handle this correctly.
+
+> 🌐 **Make sure you completed Step 2.2.5** (CMS-Target on `PG-TempInternet` with DHCP). All commands below need internet.
+
+#### Step 2.3.1 — Install Apache + MariaDB + base packages
+
 ```bash
-# Ubuntu
 sudo apt update
-sudo apt install -y apache2 mariadb-server php php-gd php-mysql php-curl php-mbstring php-xml php-cli wget unzip
-
-# Start + enable
+sudo apt install -y apache2 mariadb-server wget unzip software-properties-common
 sudo systemctl enable --now apache2 mariadb
+```
 
-# Secure MariaDB minimal
+✅ Verify: `sudo systemctl status apache2 | head -3` shows `Active: active (running)`.
+
+#### Step 2.3.2 — Add the Ondrej PPA + install PHP 7.4 (NOT default php 8.1)
+
+The Ondrej Sury PPA is the official source for older PHP versions on Ubuntu.
+
+```bash
+sudo add-apt-repository -y ppa:ondrej/php
+sudo apt update
+```
+
+Now install PHP 7.4 + the modules Drupal needs:
+
+```bash
+sudo apt install -y \
+  php7.4 \
+  php7.4-gd \
+  php7.4-mysql \
+  php7.4-curl \
+  php7.4-mbstring \
+  php7.4-xml \
+  php7.4-cli \
+  php7.4-zip \
+  libapache2-mod-php7.4
+```
+
+> ⚠️ **Watch the last package name:** `libapache2-mod-**php**7.4` (with `php` before `7.4`). NOT `libapache2-mod-7.4`. The `php` is required.
+
+#### Step 2.3.3 — Switch Apache from PHP 8.1 to PHP 7.4
+
+By default Apache uses PHP 8.1. We need to disable it and enable 7.4.
+
+```bash
+sudo a2dismod php8.1
+sudo a2enmod php7.4
+sudo systemctl restart apache2
+```
+
+✅ **Expected output:**
+```
+Module php8.1 disabled.
+Enabling module php7.4.
+```
+
+#### Step 2.3.4 — Verify Apache is using PHP 7.4 (not 8.1)
+
+`php -v` shows the **CLI** version, which is independent of Apache. To check what **Apache** uses, create a tiny test file:
+
+```bash
+echo '<?php phpinfo(); ?>' | sudo tee /var/www/html/phpinfo.php
+sudo chown www-data:www-data /var/www/html/phpinfo.php
+```
+
+Then from **Kali's Firefox** (Kali at `192.168.2.2` should be on the same `PG-MA1-CMS` port group — temporarily on `PG-TempInternet` is also fine):
+
+```
+http://<CMS-Target-current-IP>/phpinfo.php
+```
+
+(Use whatever IP CMS-Target has now — likely `192.168.1.X` from PG-TempInternet's DHCP, or `192.168.2.1` if back on PG-MA1-CMS.)
+
+At the very top of the page in big text:
+
+| What you see | Meaning | Action |
+|---|---|---|
+| `PHP Version 7.4.X` | ✅ Apache uses PHP 7.4 — Drupal will work | Continue |
+| `PHP Version 8.1.X` | ❌ Switch didn't work | Re-run `sudo a2dismod php8.1 && sudo a2enmod php7.4 && sudo systemctl restart apache2` |
+
+When you see `7.4.X`, **delete the test file** (it leaks server details):
+
+```bash
+sudo rm /var/www/html/phpinfo.php
+```
+
+#### Step 2.3.5 — Create the MariaDB database for Drupal
+
+```bash
 sudo mysql -e "CREATE DATABASE drupal; CREATE USER 'drupal'@'localhost' IDENTIFIED BY 'drupalpass'; GRANT ALL ON drupal.* TO 'drupal'@'localhost'; FLUSH PRIVILEGES;"
+```
 
-# Get Drupal 7 (the version with Drupalgeddon 2)
+✅ Verify: `sudo mysql -e "SHOW DATABASES;"` lists `drupal` in the output.
+
+#### Step 2.3.6 — Download + extract Drupal 7.57
+
+```bash
 cd /var/www
 sudo wget https://ftp.drupal.org/files/projects/drupal-7.57.tar.gz
 sudo tar xzf drupal-7.57.tar.gz
-sudo mv drupal-7.57 html-drupal
-sudo cp -r html-drupal/. /var/www/html/
-sudo rm /var/www/html/index.html  # remove default Apache page
+sudo cp -r drupal-7.57/. /var/www/html/
+sudo rm -f /var/www/html/index.html  # remove default Apache page
+```
+
+> 💡 The `cp -r drupal-7.57/. /var/www/html/` syntax (with the trailing `/.`) copies all files **including hidden ones** like `.htaccess` — important for Drupal's URL rewriting.
+
+#### Step 2.3.7 — Set up Drupal's settings.php and upload folder
+
+```bash
 sudo cp /var/www/html/sites/default/default.settings.php /var/www/html/sites/default/settings.php
 sudo chown -R www-data:www-data /var/www/html
 sudo chmod 666 /var/www/html/sites/default/settings.php
@@ -357,20 +448,60 @@ sudo chmod -R 777 /var/www/html/sites/default/files
 sudo systemctl restart apache2
 ```
 
-### Step 2.4 — Run the Drupal web installer
-From any browser (or `curl` from the same VM):
-- Visit `http://192.168.2.1/install.php`
-- *Standard* profile → Save.
-- Database type: MySQL/MariaDB.
-- DB name: `drupal`, user: `drupal`, password: `drupalpass`. → Save.
-- Site information:
-  - Site name: `Manila CMS`
-  - Site email: `admin@manila.local`
-  - **Site maintenance account → username `admin`, password `admin`** (deliberately weak — the "vulnerable user account" task)
-  - Default country: Philippines.
-  - Save.
+✅ Verify: `ls -la /var/www/html/sites/default/settings.php` shows the file with `-rw-rw-rw-` (666) permissions and `www-data:www-data` ownership.
 
-After install completes:
+#### Common Step 2.3 issues
+
+| Error | Cause | Fix |
+|---|---|---|
+| `httplib2.error.ServerNotFoundError: Unable to find the server at api.launchpad.net` (during `add-apt-repository`) | No internet on the VM | Verify `ping -c 2 8.8.8.8` works. If not, switch NIC to `PG-TempInternet` + netplan to DHCP per `09_…` |
+| `E: Unable to locate package libapache2-mod-7.4` | Typo — missing `php` in the package name | Use `libapache2-mod-php7.4` (with `php` before `7.4`) |
+| `E: Unable to locate package php7.4` (after PPA add) | Forgot `sudo apt update` after PPA | Run `sudo apt update`, then retry the install |
+| 500 Internal Server Error in Step 2.4 | Apache still using PHP 8.1 | Confirm Step 2.3.4 phpinfo shows 7.4. If not, redo Step 2.3.3 |
+| `cp: cannot stat '...settings.php'` in Step 2.3.7 | Drupal didn't extract properly | Re-run Step 2.3.6 (download + tar + cp) |
+| `chmod: cannot access '...settings.php'` | Settings.php not created (cp was skipped) | Run `sudo cp /var/www/html/sites/default/default.settings.php /var/www/html/sites/default/settings.php` first, then chmod |
+
+### Step 2.4 — Run the Drupal web installer
+
+The Drupal install wizard runs in a **browser**. Since CMS-Target is a server (no GUI), you have 3 options for the browser:
+
+| Option | When to use |
+|---|---|
+| **A — Kali's Firefox** (recommended) | Once Kali is built (`192.168.2.2` on PG-MA1-CMS). Browse to `http://192.168.2.1/install.php`. |
+| **B — PC1 browser** | If CMS-Target is on `PG-TempInternet` with a DHCP IP (e.g., `192.168.1.50`), browse to `http://192.168.1.50/install.php` from PC1. |
+| **C — w3m text-mode browser inside CMS-Target** | If neither of the above is available. Run `sudo apt install -y w3m && w3m http://localhost/install.php` |
+
+> 💡 **Most common path for beginners:** Option B (browse from PC1 while CMS-Target is on PG-TempInternet) — install Drupal first, THEN switch back to PG-MA1-CMS for final state.
+
+#### Walking through the installer
+
+Once the wizard loads, follow these screens:
+
+1. **Choose profile:** Standard → **Save and continue**.
+2. **Choose language:** English (default) → **Save and continue**.
+3. **Verify requirements:** if you see green checkmarks → continue. If you see red errors about PHP missing extensions, go back to Step 2.3.2 and confirm all `php7.4-*` packages installed.
+4. **Database configuration:**
+   - Database type: **MySQL, MariaDB, or equivalent**
+   - Database name: `drupal`
+   - Database username: `drupal`
+   - Database password: `drupalpass`
+   - Click **Save and continue**.
+5. **Install profile** runs (~30 sec progress bar).
+6. **Configure site:**
+   - Site name: `Manila CMS`
+   - Site email address: `admin@manila.local`
+   - **Site maintenance account:**
+     - Username: `admin`
+     - Email: `admin@manila.local`
+     - Password: `admin` (deliberately weak — the "vulnerable user account" task)
+     - Confirm password: `admin`
+   - Default country: Philippines
+   - Default time zone: Asia/Manila
+   - Click **Save and continue**.
+7. ✅ **"Welcome to your new Drupal site!"** — install complete.
+
+#### After install completes:
+
 ```bash
 # Tighten settings.php so Drupal stops complaining
 sudo chmod 444 /var/www/html/sites/default/settings.php

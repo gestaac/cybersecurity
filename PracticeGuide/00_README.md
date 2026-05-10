@@ -1,5 +1,23 @@
 # Team 1 — WSA2025 Cyber Security Practice Guide
 
+> 🚨 **STRUCTURE UPDATE (chief Marlon, 2026-05-10)** — final confirmed layout:
+> - **Day 1** = VAPT / MA1 CMS pentest (2 flags) — target VM is **randomly picked from VulnHub** ([vulnhub.com](https://www.vulnhub.com/)) by chief. CMS could be Drupal, WordPress, Joomla, MediaWiki, etc. — see `MA1_CMS_Cheatsheet.md` for per-CMS adaptation. Walkthrough (Drupal example): `10_Day1_MA1_Solution.md`.
+> - **Day 2** = Security Hardening / Infrastructure (MA2, full day) — `20_…` through `30_…`
+> - **Day 3 morning** = Red Teaming on **OWASP Juice Shop** — `05_Setup_JuiceShop.md` + `50_Day3_CTF_Playbook.md`
+> - **Day 3 afternoon** = Blue Teaming "Analysis and Exploitation" — **still OWASP Juice Shop**, NOT PCAP/memory/disk forensics
+>
+> 45 flags total on Day 3, randomly drawn from the 111 Juice Shop challenges.
+>
+> **OBSOLETE files** — moved to `_legacy/` folder on 2026-05-10. See `_legacy/README.md` for what they were and why they no longer apply.
+>
+> **Day-before-competition schedule:** `00_Tomorrow_Final_Schedule.md` (+ `MA2_Cheatsheet.md` to print).
+>
+> **Beginner companions** (read these first if new to pentesting):
+> - `00_Beginner_Burp_Quickstart.md` — Burp Suite from zero to first request modification
+> - `00_Beginner_Linux_Commands.md` — every Linux command you'll need tomorrow with examples
+> - `MA1_CMS_Cheatsheet.md` — per-CMS attack recipes for Day 1 (Drupal / WordPress / Joomla / MediaWiki / generic + hashcat modes + universal privesc checklist)
+> - `Network_Discovery_Cheatsheet.md` — find live IPs on the venue network; team's IP scheme per topology (ESXi `.10`, PC1 `.11`, PC2 `.12`, CTFD `.100`); setup-day playbook
+
 Step-by-step practice playbook for the WorldSkills ASEAN Manila 2025 Cyber Security skill (skill 54). Takes **Team 1 — you, your teammate, and the ESXi server (your 3rd team unit)** — from **zero installed software** to a **full dry-run** of every gradeable activity across the **3-day competition**.
 
 > 👥 **This guide is for both team members.** It's the single source of truth you both work from — same files, same role split, same marking-map. See **`91_Team_Strategy.md`** for the per-day "who does what" plan.
