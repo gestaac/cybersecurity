@@ -546,10 +546,49 @@ Add a flag in `/root/`:
 echo "Root flag: flag{root_compromise_complete_2025}" | sudo tee /root/proof.txt
 ```
 
-### Step 2.7 — Sanity test
-From the same VM browser: `http://192.168.2.1` → see Drupal home page. Login as `admin/admin` → confirm admin panel loads.
+### Step 2.7 — Inject Task 1 Q2 secret message into Drupal's homepage HTML
 
-### Step 2.8 — Snapshot
+The MA1 walkthrough (`10_Day1_MA1_Solution.md` Task 1 Q2) expects a hidden HTML comment in the Drupal homepage source. We inject it into the active theme so the comment appears in every rendered page.
+
+```bash
+SECRET='<!-- secret: flag{worldskills_manila_2025} -->'
+THEME=/var/www/html/themes/bartik/templates/page.tpl.php
+
+# Backup first
+sudo cp $THEME ${THEME}.bak
+
+# Inject at line 1 (raw HTML — appears before any other output)
+sudo sed -i "1i$SECRET" $THEME
+
+# Clear Drupal's page cache so the change is immediately visible
+mysql -u drupal -pdrupalpass drupal -e "DELETE FROM cache_page; DELETE FROM cache;"
+
+# Optional: clear filesystem CSS/JS caches
+sudo rm -rf /var/www/html/sites/default/files/css/*
+sudo rm -rf /var/www/html/sites/default/files/js/*
+```
+
+✅ Verify from Kali (or the same VM):
+```bash
+curl -s http://192.168.2.1/ | grep -i "secret"
+# Expected: <!-- secret: flag{worldskills_manila_2025} -->
+```
+
+> 🧠 **Why the Bartik theme path?** Bartik is Drupal 7's default active theme. Its `page.tpl.php` is the top-level template rendered on every page. Adding raw HTML at line 1 outputs it before any PHP `header()` calls, so it appears in every page's source without breaking Drupal.
+
+> If the verify command returns nothing, try `sudo systemctl restart apache2` then re-test. If `mysql` says command not found, try `mariadb` instead.
+
+> **Rollback (if you need to undo):**
+> ```bash
+> sudo cp /var/www/html/themes/bartik/templates/page.tpl.php.bak \
+>         /var/www/html/themes/bartik/templates/page.tpl.php
+> mysql -u drupal -pdrupalpass drupal -e "DELETE FROM cache_page; DELETE FROM cache;"
+> ```
+
+### Step 2.8 — Sanity test
+From the same VM browser: `http://192.168.2.1` → see Drupal home page. Login as `admin/admin` → confirm admin panel loads. Also `curl -s http://192.168.2.1/ | head -3` should show the injected HTML secret comment as the first line.
+
+### Step 2.9 — Snapshot
 Snapshot the VM as `cms-target-vulnerable`. This is the **starting state** for every MA1 dry-run.
 
 ---
