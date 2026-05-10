@@ -10,6 +10,87 @@
 
 ---
 
+## 📖 Beginner orientation — Active Directory + GPOs
+
+**Active Directory (AD)** is Windows' enterprise user/computer database. WINSRV1 is the Domain Controller (DC) — the brain that decides who's allowed in and what they can do.
+
+**Group Policy Object (GPO)** = a bundle of settings pushed to all domain-joined computers/users. Examples: "set screensaver timeout to 10 sec," "block the Control Panel," "deploy a certificate."
+
+### Tools you'll use (memorize the keyboard shortcuts to launch them)
+
+| Tool | Win+R command | Used for |
+|---|---|---|
+| **Active Directory Users and Computers (ADUC)** | `dsa.msc` | Create/edit users, groups, OUs |
+| **Active Directory Administrative Center (DSAC)** | `dsac.exe` | Fine-Grained Password Policies (Step 2) |
+| **Group Policy Management Console (GPM)** | `gpmc.msc` | Create/link/edit GPOs (most of this file) |
+| **Server Manager** | `servermanager.exe` | File shares (Step 9) |
+| **Event Viewer** | `eventvwr.msc` | View audit logs (Step 10) |
+| **DNS Manager** | `dnsmgmt.msc` | DNS records (referenced from `30_…`) |
+
+### How to log into WINSRV1
+
+1. VMware Workstation → click `WINSRV1` tab → Power On
+2. Wait for Windows Server desktop login screen
+3. Click **Other user** if needed
+4. Username: `MANILA\Administrator` (full domain prefix required)
+5. Password: `P@ssw0rd`
+6. Login → Server Manager auto-opens (you can ignore it for now)
+
+### Anatomy of GPM (Group Policy Management)
+
+When you open `gpmc.msc`, you see:
+```
+Group Policy Management
+└── Forest: manila.com
+    └── Domains
+        └── manila.com                                    ← right-click here to create GPO
+            ├── Default Domain Policy                     ← edit this for password policy
+            ├── Default Domain Controllers Policy         ← built-in, leave alone
+            ├── (your custom GPOs appear here once linked)
+            ├── Domain Controllers (OU)
+            ├── Manila (OU)                                ← where users live
+            └── Group Policy Objects (folder)             ← all GPOs (linked or not)
+```
+
+### How to CREATE a new GPO (you'll do this 8 times in this file)
+
+1. In GPM left tree → expand `Forest: manila.com → Domains → manila.com`
+2. **Right-click** on `manila.com` (the domain itself, not an OU)
+3. Select **Create a GPO in this domain, and Link it here...**
+4. **Name:** type the GPO name (e.g. `LoginBanner`, `lockout`, `restrict control panel`)
+5. **Source Starter GPO:** (none) → click OK
+6. The new GPO now appears under `manila.com`. **Right-click it → Edit** to configure settings
+7. The **Group Policy Management Editor** opens — this is where you change the actual settings
+
+### How to EDIT GPO settings
+
+1. Right-click the GPO under manila.com → **Edit**
+2. The editor opens with two trees:
+   - **Computer Configuration** → applies to computer accounts
+   - **User Configuration** → applies to user accounts
+3. Drill down to the path specified in each step (e.g. `Computer Configuration → Policies → Windows Settings → Security Settings → ...`)
+4. Double-click a policy → set its value → OK
+5. Close the editor (changes auto-save)
+
+### How to APPLY a GPO immediately (instead of waiting up to 90 min)
+
+After creating/editing a GPO, on the target computer (Client1, Client2, or WINSRV1 itself):
+```cmd
+gpupdate /force
+```
+Wait for "Computer Policy update has completed successfully."
+
+### Common gotchas
+
+| Symptom | Fix |
+|---|---|
+| GPO created but settings don't apply | Did you LINK it to a scope? Right-click GPO under `Group Policy Objects` folder → "Link an Existing GPO" to manila.com |
+| Settings apply to wrong users | Check **Scope** tab → **Security Filtering** — by default GPO applies to "Authenticated Users" (everyone). Add specific groups to restrict. |
+| Password policy not enforced | Account Policies (password / lockout) MUST be in a GPO linked to the **domain root**, not an OU |
+| User can still access blocked thing | User cached old policy. Have them sign out + sign in → forces fresh GPO load. |
+
+---
+
 ## Step 1 — Domain Password Policy (8-char + history of 30)
 
 **Per MA2 PDF page 11:** *"Create a password policy that requires all domain users' passwords to be 8 characters in length, and keep a history of 30 past passwords."*

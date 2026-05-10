@@ -8,6 +8,52 @@
 
 ---
 
+## 📖 Beginner orientation — what we're hardening on LinSRV1
+
+LinSRV1 is a CentOS Linux server in the DMZ that hosts a public website (`www.manila.com`). "Hardening" means tightening its security to industry standard. You'll do 7 things:
+
+| What | Why | Mark |
+|---|---|---|
+| Domain join `manila.com` | So domain users (C1, C2) can SSH in with their AD credentials | D66, D67 |
+| SSH on port 2022, no root, only C1/C2 | Standard SSH hardening — lock down remote access | D68 |
+| firewalld active + correct services | Block all ports except needed ones | D70-D75 |
+| Linux password complexity + ageing | Same enforcement as Windows side | D72 |
+| sudo for C1 + C2 only | Only specific users can elevate to root | D73 |
+| SELinux Enforcing + httpd context | Mandatory access control — even root can't escape it | D76, D77 |
+| HTTPS with cert from WINSRV3 CA | Public website signed by company CA, no cert warnings | D78 |
+
+### How to connect to LinSRV1 from Client1
+
+1. On Client1, open PuTTY (Start menu → search "PuTTY" → click)
+2. PuTTY config window:
+   - **Host Name:** `192.168.1.10`
+   - **Port:** `22` (FIRST time only — after Step 3 below it'll be `2022`)
+   - **Connection type:** SSH
+3. Click **Open**
+4. If "PuTTY Security Alert" pops up about server's host key → click **Accept** (one-time, just first connection)
+5. `login as:` → `root`
+6. `password:` → `P@ssw0rd`
+
+You're now at: `[root@LinSRV1 ~]#`
+
+### Quick command reference
+
+| Command | What it does |
+|---|---|
+| `pwd` | print current directory |
+| `ls -la` | list files including hidden, with details |
+| `cat /etc/passwd` | show all users on the system |
+| `sudo systemctl status <service>` | check if a service is running |
+| `sudo systemctl enable --now <service>` | enable + start a service |
+| `sudo nano /path/to/file` | edit a file (Ctrl+O = save, Ctrl+X = exit) |
+| `firewall-cmd --list-all` | show current firewall rules |
+
+### About `sudo`
+
+LinSRV1 has SELinux enabled — be careful. If a command fails with "Permission denied" even as root, it's likely SELinux. We'll set policies in Step 6.
+
+---
+
 ## Step 1 — Domain join `manila.com`
 **Why:** lets domain users (C1, C2) ssh in with AD credentials.
 **Pre-req:** WINSRV1 reachable via 192.168.2.10 from LinSRV1 (firewall rule DMZ→Servers AD ports must already be in place per `20_…`).

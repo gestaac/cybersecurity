@@ -8,6 +8,58 @@
 
 ---
 
+## 📖 Beginner orientation — PKI in this environment
+
+**PKI (Public Key Infrastructure)** = the system of certificates + Certificate Authorities (CAs) that proves "this server is really who it claims to be."
+
+### The 2-tier PKI architecture in this lab
+
+```
+┌─────────────────────────────────────────────────┐
+│ WINSRV4  (Offline Root CA)  — already done      │
+│  192.168.2.50                                    │
+│  Powered OFF after signing the sub-CA cert.     │
+│  In real industry, kept in a vault.             │
+└─────────────────────────────────────────────────┘
+                    │ signed
+                    ▼
+┌─────────────────────────────────────────────────┐
+│ WINSRV3  (Issuing CA / Subordinate CA)          │
+│  192.168.2.30                                    │
+│  Online — issues all the day-to-day certs.      │
+│  THIS is the box you work on.                    │
+└─────────────────────────────────────────────────┘
+                    │ issues certs to
+        ┌───────────┼─────────────┬──────────┐
+        ▼           ▼             ▼          ▼
+   Client1/2   LinSRV1 web    pfSense    WINSRV3 IIS
+   (auto via    cert          OpenVPN   (webtest.manila.com)
+    GPO)
+```
+
+### Tools you'll use on WINSRV3
+
+| Tool | Win+R | Purpose |
+|---|---|---|
+| **Certification Authority (CA console)** | `certsrv.msc` | Manage issued certs, templates |
+| **Local Computer Certificates** | `certlm.msc` | View certs in the COMPUTER store |
+| **Current User Certificates** | `certmgr.msc` | View certs in the USER store |
+| **IIS Manager** | `inetmgr` | Configure HTTPS for webtest.manila.com |
+
+### How to log into WINSRV3
+
+1. VMware Workstation → WINSRV3 tab → Power On
+2. Login: `MANILA\Administrator` / `P@ssw0rd`
+3. Server Manager opens (ignore for now)
+
+### The 3 deliverables for PKI
+
+1. **CA is running and shows issued certs** → Step 1-2
+2. **Cert auto-enrolled to client computers via GPO** → Step 2.1 (template) + `22_…` Step 8 (GPO)
+3. **Cert issued to LinSRV1 web server + WINSRV3 IIS** → Step 3-4
+
+---
+
 ## Step 1 — Confirm CertSvc is running
 
 The practice setup left CertSvc **stopped** (CSR pending). It should now be started because WINSRV4 already signed the CSR during initial build (`04_Setup_VMs_MA2.md` Step 5.3).

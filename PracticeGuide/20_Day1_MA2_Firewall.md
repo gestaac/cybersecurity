@@ -11,6 +11,66 @@
 
 ---
 
+## 📖 Beginner orientation — the pfSense WebUI
+
+pfSense is configured entirely through a web browser interface (called the **WebConfigurator** or **WebUI**). Think of it like a router admin page on steroids.
+
+### How to access pfSense
+
+1. Power on **Client1** in VMware (it's on the LAN side, can reach pfSense)
+2. Login as any domain user (`MANILA\M001` / `P@ssw0rd` — but local admin works too for first-time setup)
+3. Open **Chrome** (taskbar icon)
+4. URL bar → type: `https://172.16.100.254` → Enter
+5. Browser warning "Your connection is not private" → click **Advanced** → **Proceed to 172.16.100.254 (unsafe)** (this is normal — pfSense uses self-signed cert until you replace it)
+6. Login screen:
+   - Username: `admin`
+   - Password: `pfsense` (default — we'll change this in Step 1)
+7. Click **SIGN IN**
+
+You're now in the pfSense **Dashboard**.
+
+### Top menu bar — what each section does
+
+| Menu | What's inside | Used in step |
+|---|---|---|
+| **System** | User Manager, Cert Manager, Package Manager, Backup | Step 1, 5, 6 |
+| **Interfaces** | LAN, WAN, DMZ, Servers — interface IPs + settings | (already configured) |
+| **Firewall** | Rules, NAT, Aliases, Schedules | Steps 3, 4 |
+| **Services** | DHCP Server, Snort, OpenVPN, DNS Resolver | Steps 2, 5, 6 |
+| **VPN** | OpenVPN client/server config | Step 5 |
+| **Status** | Dashboard, System logs, Services status | Verification |
+| **Diagnostics** | Backup/Restore, Tools, Logs | Step 8 |
+
+### Common actions you'll repeat
+
+- **Save** any change → click the **Save** button at the bottom of the form
+- **Apply changes** → after saving, a **green Apply Changes** banner appears at top → click it
+- **Add a new entry** to a list → look for **+ Add** button (usually top-right of a table)
+- **Edit existing entry** → click the pencil icon ✏️ next to a row
+- **Delete entry** → click the trash icon 🗑️ next to a row
+
+> 🧠 **MEMORIZE:** every change in pfSense takes 2 clicks — first **Save**, then **Apply Changes** banner. If you only Save without Apply, the change isn't live yet.
+
+### The "Add firewall rule" walkthrough (you'll do this many times)
+
+Every firewall rule in Step 4 follows this pattern:
+1. Top menu → **Firewall** → **Rules**
+2. Click the **interface tab** (LAN / DMZ / Servers / WAN)
+3. Click **+ Add** (top-right) — there are TWO Add buttons (up arrow ⬆️ and down arrow ⬇️) — for now use the **down arrow** (adds at bottom)
+4. Form opens. Fill in:
+   - **Action:** `Pass` (allow) or `Block` (deny)
+   - **Protocol:** TCP, UDP, or any
+   - **Source:** Single host, network, or alias name
+   - **Destination:** same options
+   - **Destination Port Range:** From + To (or use an alias for multi-port)
+   - **Description:** anything (free text — judges look at this for "FW best practice" judgment)
+5. Click **Save**
+6. Click the green **Apply Changes** banner
+
+Repeat for each rule. **The order of rules MATTERS** — pfSense processes top-to-bottom, first match wins. Default rule at the bottom is always block.
+
+---
+
 ## Step 1 — Change admin password
 **Why:** default credentials are auto-marked as a fail.
 **Where:** pfSense WebUI → *System → User Manager → admin → Edit*
@@ -102,40 +162,187 @@ Alternative (cleaner): use pfBlockerNG package — add `www.starcity.com.ph` to 
 
 ---
 
-## Step 5 — OpenVPN
-**Why:** VPN Users group must dial in from Client3 with cert from WINSRV3.
+## Step 5 — OpenVPN (the most complex step — go slowly)
+
+**Why:** Client3 (external) must dial into the LAN through OpenVPN, authenticated by AD users in the `VPNGroup` group, using a cert from WINSRV3 CA.
+
+> 🧠 **OpenVPN setup has 3 parts working together:**
+> 1. **CA + server cert** (from WINSRV3) → tells OpenVPN clients pfSense is legitimate
+> 2. **LDAP backend** (queries WINSRV1) → who is allowed to login (VPNGroup members)
+> 3. **OpenVPN server config** (on pfSense) → glues 1 and 2 together
+>
+> Do them in this order: CA → LDAP → Server.
 
 ### 5.1 Get the CA + server cert from WINSRV3
-On WINSRV3:
-1. Open `certlm.msc` → *Personal → Certificates* → find Subordinate CA cert → export with private key (PFX) → save as `winsrv3-ca.pfx` password `P@ssw0rd`.
-2. Issue a new cert template "OpenVPN-Server" with EKU = "Server Authentication" → request via `certreq` → export `openvpn-server.crt` + `.key`.
 
-### 5.2 Import in pfSense
-- *System → Cert Manager → CAs → Add* → paste WINSRV3 CA chain.
-- *Certificates → Add* → paste server cert + key.
+#### 5.1a — Create the AD group `VPNGroup` and user `VPNUser`
 
-### 5.3 Configure OpenVPN server
-**Where:** *VPN → OpenVPN → Servers → Add*
-- Server mode: `Remote Access (User Auth)` (so it auths against AD)
-- Backend for authentication: create a LDAP server first under *System → User Manager → Authentication Servers* → LDAP to WINSRV1 (`ldap://192.168.2.10`, baseDN `DC=manila,DC=com`, group filter `memberOf=CN=VPNGroup,...`) — **group name is exactly `VPNGroup`** (per MA2 PDF page 10), member `VPNUser` with password `P@ssw0rd`
-- Protocol: UDP/IPv4
-- Interface: WAN
-- Local port: 1194
-- Server cert: openvpn-server (the one you imported)
-- DH params: 2048
-- Tunnel network: `10.8.0.0/24`
-- Local network: `172.16.100.0/24, 192.168.2.0/24` (so VPN users reach LAN + Servers)
-- Topology: subnet
-- Save.
+On WINSRV1 (do this first — LDAP backend needs the group to exist):
 
-### 5.4 Add WAN rule for OpenVPN
-*Firewall → Rules → WAN* → Add: Pass UDP any → WAN address port 1194.
+1. Open **Active Directory Users and Computers** (Win+R → `dsa.msc` → Enter)
+2. Right-click on a suitable OU (e.g. `Manila`) → **New → Group**
+   - Group name: `VPNGroup`
+   - Group scope: Global
+   - Group type: Security
+   - OK
+3. Right-click `VPNGroup` → **Properties** → **Members** tab → **Add**
+4. Type `VPNUser` → click Check Names → if not found, create it first:
+   - Right-click OU → New → User
+   - First name: `VPN`, Last name: `User`, User logon name: `VPNUser`
+   - Password: `P@ssw0rd`, untick "User must change password at next logon", tick "Password never expires"
+   - Finish
+5. Add VPNUser to VPNGroup
 
-### 5.5 Export client config
-- Install the **OpenVPN Client Export Utility** package: *System → Package Manager → Available Packages → openvpn-client-export → Install*.
-- *VPN → OpenVPN → Client Export* → choose your server → download the **Inline Configurations: Most Clients** `.ovpn` file → keep on USB for Client3.
+> 🧠 **MEMORIZE:** group name is **exactly `VPNGroup`** (per MA2 PDF page 10) — case-sensitive in some configs.
 
-**Marks:** [Crit A2 D56 K=0.7] OpenVPN installed; [Crit A2 D57 K=0.25] cert from CA, not self-signed.
+#### 5.1b — Export root CA chain from WINSRV3
+
+On WINSRV3 (this is the issuing CA — `23_…` Step 2 should be done):
+
+1. Win+R → `certlm.msc` → Enter (this is the **Local Machine** cert store)
+2. Left tree → **Personal → Certificates**
+3. Find your subordinate CA cert (issuer = Manila-Root-CA)
+4. Right-click → **All Tasks → Export**
+5. Wizard:
+   - "Export private key" → Yes (private key needed for pfSense as a CA)
+   - File format: `.pfx` (Personal Information Exchange)
+   - Password: `P@ssw0rd` (encryption password for the PFX file)
+   - Save as: `C:\winsrv3-ca.pfx`
+
+#### 5.1c — Issue a server cert for OpenVPN
+
+```powershell
+# On WINSRV3 PowerShell as admin
+certreq -enroll -machine -q "Web-Server-Manila"
+# Or use IIS Manager → Server Certificates → Create Domain Certificate
+```
+
+Export the new cert + private key as PFX:
+1. `certlm.msc` → Personal → Certificates
+2. Find the new cert (Subject = WINSRV3.manila.com)
+3. Right-click → All Tasks → Export → with private key → PFX → password `P@ssw0rd` → save as `C:\openvpn-server.pfx`
+
+Copy both PFX files to a USB or network share where pfSense can grab them. Or just copy/paste the PEM contents into pfSense's web UI.
+
+### 5.2 Import certs into pfSense
+
+#### 5.2a — Import CA
+1. pfSense WebUI → top menu **System → Cert Manager**
+2. Top tab **CAs** → click **+ Add**
+3. **Descriptive name:** `Manila-Sub-CA`
+4. **Method:** Import an existing Certificate Authority
+5. **Certificate data:** paste the WINSRV3 sub-CA cert (PEM format — extract from the PFX using openssl or Windows export wizard "Base-64 encoded X.509 .CER")
+6. **Certificate Private Key:** paste the private key (also PEM)
+7. **Save**
+
+#### 5.2b — Import server cert
+1. pfSense → System → Cert Manager → tab **Certificates**
+2. **+ Add/Sign**
+3. **Method:** Import an existing Certificate
+4. **Descriptive name:** `openvpn-server`
+5. Paste cert + private key
+6. **Save**
+
+> ⚠️ **If "Save" errors with "x509 verification failed":** the CA cert and server cert don't form a valid chain. Make sure the CA cert (5.2a) is imported FIRST and is the one that signed the server cert.
+
+### 5.3 Configure LDAP backend (so VPN users can authenticate against AD)
+
+1. pfSense → **System → User Manager**
+2. Top tab **Authentication Servers** → click **+ Add**
+3. Fill in:
+   - **Descriptive name:** `manila-ldap`
+   - **Type:** LDAP
+   - **Hostname or IP address:** `192.168.2.10` (WINSRV1)
+   - **Port value:** `389`
+   - **Transport:** TCP - Standard
+   - **Protocol version:** 3
+   - **Server Timeout:** 25
+   - **Search scope — Level:** Entire Subtree
+   - **Search scope — Base DN:** `DC=manila,DC=com`
+   - **Authentication containers:** `CN=Users,DC=manila,DC=com`
+   - **Bind anonymous:** ☐ **uncheck**
+   - **Bind credentials user DN:** `CN=Administrator,CN=Users,DC=manila,DC=com`
+   - **Bind credentials password:** `P@ssw0rd`
+   - **Initial Template:** Microsoft AD
+   - **User naming attribute:** `samAccountName`
+   - **Group naming attribute:** `cn`
+   - **Group member attribute:** `memberOf`
+4. Click **Save**
+
+#### 5.3a — Test LDAP
+
+1. **System → User Manager → Authentication Servers**
+2. Top tab **Diagnostics → Authentication**
+3. Authentication Server: `manila-ldap`
+4. Username: `VPNUser`, Password: `P@ssw0rd`
+5. Click **Test**
+
+**✅ Success:** "User VPNUser authenticated successfully" + group membership shows `VPNGroup`.
+**❌ Failure:** check Bind credentials, BaseDN, network connectivity (LAN→Servers AD ports rule must be in place from Step 4.1).
+
+### 5.4 Configure OpenVPN server
+
+1. pfSense → **VPN → OpenVPN**
+2. Top tab **Servers** → **+ Add**
+3. Fill in (long form — go slowly):
+
+| Section | Field | Value |
+|---|---|---|
+| General | **Server mode** | `Remote Access ( User Auth )` |
+| General | **Backend for authentication** | `manila-ldap` (selected from Step 5.3) |
+| General | **Protocol** | UDP on IPv4 only |
+| General | **Device mode** | tun - Layer 3 Tunnel Mode |
+| General | **Interface** | WAN |
+| General | **Local port** | `1194` |
+| General | **Description** | `OpenVPN-Manila` |
+| Crypto | **TLS Configuration** | ☑ Use a TLS Key |
+| Crypto | **Generate TLS Key** | ☑ Automatically generate a TLS Key |
+| Crypto | **Peer Certificate Authority** | `Manila-Sub-CA` (from Step 5.2a) |
+| Crypto | **Server certificate** | `openvpn-server` (from Step 5.2b) |
+| Crypto | **DH Parameters Length** | 2048 |
+| Tunnel | **Tunnel Network** | `10.8.0.0/24` |
+| Tunnel | **Local Network/s** | `172.16.100.0/24, 192.168.2.0/24, 192.168.1.0/24` |
+| Tunnel | **Concurrent connections** | `10` |
+| Tunnel | **Topology** | Subnet |
+| Client Settings | **DNS Server 1** | `192.168.2.10` (WINSRV1) |
+| Client Settings | **Force DNS cache update** | ☑ check |
+| Advanced | **Custom options** | `push "redirect-gateway def1"` |
+
+4. **Save** at the bottom
+
+### 5.5 Allow OpenVPN traffic on WAN
+
+1. **Firewall → Rules → WAN** tab
+2. **+ Add (down arrow ⬇️)**
+3. Action: `Pass`, Protocol: `UDP`, Source: any, Destination: `WAN address`, Destination port: `1194`, Description: `Allow OpenVPN`
+4. **Save → Apply Changes**
+
+### 5.6 Allow tunneled traffic on the OpenVPN interface
+
+After step 5.4 saves, pfSense creates a new interface called **OpenVPN**. Need a rule on it to allow tunneled traffic to LAN/Servers:
+
+1. **Firewall → Rules → OpenVPN** tab
+2. **+ Add**
+3. Action: `Pass`, Protocol: any, Source: `Network 10.8.0.0/24`, Destination: any, Description: `Allow VPN clients to LAN/Servers`
+4. **Save → Apply Changes**
+
+### 5.7 Install + use the Client Export package
+
+1. **System → Package Manager → Available Packages**
+2. Search box: `openvpn-client-export`
+3. Click **Install** → Confirm
+4. Wait ~1 min for install
+5. **VPN → OpenVPN → Client Export** tab
+6. Settings:
+   - **Remote Access Server:** select `OpenVPN-Manila`
+   - **Host Name Resolution:** Other → enter pfSense WAN IP (e.g. the public WAN IP from ISP)
+   - **Verify Server CN:** Automatic
+7. Scroll down to **OpenVPN Clients** section → click **Inline Configurations → Most Clients**
+8. A `.ovpn` file downloads to Client1's Downloads folder
+
+> 🧠 **Save the .ovpn file to a USB stick** — you'll need to copy it to Client3 for the A8.1 verification test.
+
+**Marks:** [Crit A2 D56 K=0.7] OpenVPN installed; [Crit A2 D57 K=0.25] cert from CA (NOT self-signed).
 
 ---
 
