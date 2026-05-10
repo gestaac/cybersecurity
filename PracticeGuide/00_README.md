@@ -17,6 +17,8 @@
 > - `00_Beginner_Linux_Commands.md` — every Linux command you'll need tomorrow with examples
 > - `MA1_CMS_Cheatsheet.md` — per-CMS attack recipes for Day 1 (Drupal / WordPress / Joomla / MediaWiki / generic + hashcat modes + universal privesc checklist)
 > - `Network_Discovery_Cheatsheet.md` — find live IPs on the venue network; team's IP scheme per topology (ESXi `.10`, PC1 `.11`, PC2 `.12`, CTFD `.100`); setup-day playbook
+> - `DC1_Import_Setup.md` — how to import the DC-1 VulnHub VM into ESXi + assign a network/IP (use this once before Day 1 practice)
+> - `10_Day1_MA1_Solution_v2_DC1.md` — **MA1 walkthrough v2 tailored to DC-1** (replaces `10_Day1_MA1_Solution.md` for tonight's practice — closer to what chief will hand you tomorrow)
 
 Step-by-step practice playbook for the WorldSkills ASEAN Manila 2025 Cyber Security skill (skill 54). Takes **Team 1 — you, your teammate, and the ESXi server (your 3rd team unit)** — from **zero installed software** to a **full dry-run** of every gradeable activity across the **3-day competition**.
 

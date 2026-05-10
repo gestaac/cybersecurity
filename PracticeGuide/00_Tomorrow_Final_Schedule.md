@@ -99,7 +99,9 @@ Both:
 Both members run **independent timed dry-runs** on separate Kali instances. Target: ≤ 90 min each.
 
 References:
-- Walkthrough: `PracticeGuide/10_Day1_MA1_Solution.md` (Drupal example)
+- **Primary walkthrough: `PracticeGuide/10_Day1_MA1_Solution_v2_DC1.md`** ⭐ (DC-1 VulnHub VM — closest to what chief will hand you tomorrow)
+- DC-1 import + IP setup: `PracticeGuide/DC1_Import_Setup.md`
+- Original Drupal walkthrough (older example): `PracticeGuide/10_Day1_MA1_Solution.md`
 - **CMS adaptation cheat-sheet: `PracticeGuide/MA1_CMS_Cheatsheet.md`** ⭐
 
 > 🚨 **CRITICAL — Day 1 target = randomly-picked VulnHub VM.** Chief Marlon confirmed they pick the CMS from `vulnhub.com`. The CMS could be Drupal (your practice), WordPress, Joomla, MediaWiki, or other. Step 1 (recon) and Steps 5-11 (user crack → privesc → report) are identical for every CMS. Only Steps 2-4 (identify CMS, find exploit, exploit) change. Read `MA1_CMS_Cheatsheet.md` to know which tool maps to which CMS.
