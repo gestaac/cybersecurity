@@ -192,17 +192,18 @@ mysql -u drupal -pdrupalpass drupal -e "SELECT uid,name,mail,pass FROM users;"
 
 ## Task 3 — System Security Weaknesses
 
-> 🧠 **Pre-flight — set placeholder variables on Kali before running Task 3 commands.**
+> 🧠 **Pre-flight — set the username variable on Kali before running Task 3.**
 >
-> Your weak user might be named `john`, `mark`, `alice`, or whatever you (or chief) created. Set these variables ONCE on Kali, then reuse them in every command below:
+> At this point you know the **username** (you discovered it in the Drupal users table dump from Task 2 Q2 — could be `john`, `mark`, `alice`, etc.). You do NOT know the password yet — that's what hashcat will crack in Q2 below.
 >
 > ```bash
-> # On Kali — set these two variables to match YOUR setup:
-> export VICTIM=john              # ← change to your weak user's name
-> export VPASS=password123        # ← change to the password you set / expect to crack
+> # On Kali — set the username:
+> export VICTIM=john              # ← change to YOUR weak user's name
 > ```
 >
-> Throughout Task 3, you'll see `$VICTIM` (the username) and `$VPASS` (the password). If you change to a different terminal session, re-run these `export` lines.
+> The **password variable `$VPASS` gets set AFTER hashcat cracks it** (see Q2 step 2.2 below). Until then, you don't know it.
+>
+> Throughout Task 3 you'll see `$VICTIM` (username — set now) and `$VPASS` (password — set after Q2). If you switch terminal sessions, re-run the `export` lines.
 
 ### Q1 — Identify the user account that exposes the system weakness
 
@@ -290,11 +291,18 @@ $S$D...:<your_cracked_password>
 Status...........: Cracked
 ```
 
-Update your `VPASS` variable with the actual cracked value (handy for later steps):
+The plain-text password (after the `:` colon) is what hashcat just recovered from the hash. **NOW set the VPASS variable** with this cracked value — you'll use it for SSH in Q3:
+
 ```bash
+# Replace <paste_here> with the actual plain-text password hashcat just printed
 export VPASS=<paste_cracked_password_here>
-echo "Cracked: $VICTIM = $VPASS"
+
+# Verify
+echo "Username: $VICTIM"
+echo "Cracked password: $VPASS"
 ```
+
+Example: if hashcat showed `$S$D...:letmein123`, then run `export VPASS=letmein123`.
 
 Show the cracked result anytime later:
 ```bash
